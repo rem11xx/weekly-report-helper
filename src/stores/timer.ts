@@ -112,6 +112,12 @@ export const useTimerStore = defineStore("timer", () => {
     total.value = 0;
   }
 
+  /** 手动结束专注：走与自然结束相同的「弹窗选任务 → 记录 session → 进休息」流程 */
+  function manualEnd() {
+    stopTick();
+    onTimerEnd();
+  }
+
   /** 计时结束处理 */
   async function onTimerEnd() {
     if (phase.value === "focus") {
@@ -222,6 +228,7 @@ export const useTimerStore = defineStore("timer", () => {
     pause,
     resume,
     reset,
+    manualEnd,
     selectTask,
     loadTaskOptions,
   };

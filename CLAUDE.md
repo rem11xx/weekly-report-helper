@@ -8,6 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The UI and all user-facing strings are Chinese (zh-CN). Match this when adding UI text.
 
+## Problem-tracking workflow
+
+User-reported problems are **recorded, not fixed immediately**. The user decides modification order and priority; when asked to fix generally (no specific `P###`), Claude assesses priority by impact and fixes only the top 3 — not all at once.
+
+- Problem list lives at `PROBLEMS.md` (repo root) — plain Markdown so other tools can read it.
+- When the user reports a problem, append a new row to the **问题清单** table in `PROBLEMS.md`: next `P###` id, 状态 `待处理`, 模块/页面, 问题描述, today's date. Leave 优先级 blank for the user to fill.
+- Do **not** start modifying code for a recorded problem unless the user explicitly asks (e.g. "修 P002"/"开始处理…"). If unsure whether something is blocking/urgent, ask before recording vs. fixing.
+- When fixed and self-checked (build/type-check passing), set 状态 `已修复` (note what was done in 备注); when the user confirms it in the running app, set `已关闭` and delete that problem's records (table row + its 方案 section) from `PROBLEMS.md`.
+- Status values: 待处理 / 已修复 / 已关闭. Priority values (高 / 中 / 低) — user-assigned, or assessed by Claude by impact when the user hasn't assigned them.
+
 ## Commands
 
 Frontend (run from repo root, uses pnpm):

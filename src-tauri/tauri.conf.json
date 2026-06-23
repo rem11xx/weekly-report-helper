@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "工作周报助手",
-        "width": 960,
-        "height": 720,
-        "minWidth": 720,
+        "width": 460,
+        "height": 760,
+        "minWidth": 420,
         "minHeight": 540,
         "resizable": true
       }

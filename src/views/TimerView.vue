@@ -2,27 +2,39 @@
 import { onMounted, ref, computed } from "vue";
 import { useTimerStore } from "@/stores/timer";
 import { useReportStore } from "@/stores/report";
+import { usePlanStore } from "@/stores/plan";
 import { useClockStore } from "@/stores/clock";
 import CountdownRing from "@/components/CountdownRing.vue";
 import TaskPickerModal from "@/components/TaskPickerModal.vue";
+import PlanInputModal from "@/components/PlanInputModal.vue";
+import ReportPreviewModal from "@/components/ReportPreviewModal.vue";
 import {
   NButton,
   NSpace,
   NButtonGroup,
-  NAlert,
   NTag,
   NDatePicker,
   NCard,
+  NIcon,
 } from "naive-ui";
+import {
+  PlayOutline,
+  StopOutline,
+  RefreshOutline,
+} from "@vicons/ionicons5";
 
 const timer = useTimerStore();
 const report = useReportStore();
+const plan = usePlanStore();
 const clock = useClockStore();
 
 const isDev = import.meta.env.DEV;
+/** dev 模式下也可隐藏「模拟时间」面板（用于验证生产界面）。环境变量 VITE_HIDE_DEV_PANEL=1 时隐藏。 */
+const showDevPanel = isDev && !import.meta.env.VITE_HIDE_DEV_PANEL;
 
-// ---- dev 模拟时间面板 ----
-// NDatePicker(datetime) 的值是时间戳(ms)；null 表示未选
+const showPlanModal = ref(false);
+const showReportModal = ref(false);
+
 const pickerValue = ref<number | null>(
   clock.mockNow ? new Date(clock.mockNow).getTime() : null
 );
@@ -31,7 +43,6 @@ const mockLabel = computed(() =>
   clock.mockNow ? `模拟时间：${clock.mockNow}` : "使用真实系统时间"
 );
 
-/** ms 时间戳 → 后端期望的 YYYY-MM-DDTHH:MM */
 function toIso(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -40,10 +51,9 @@ function toIso(ms: number): string {
   )}:${pad(d.getMinutes())}`;
 }
 
-/** 生成"本周某天某时"的 ISO 字符串（基于真实今天） */
 function isoThisWeek(weekday: number, hour: number, minute = 0): string {
   const now = new Date();
-  const cur = now.getDay() === 0 ? 7 : now.getDay(); // 周日→7
+  const cur = now.getDay() === 0 ? 7 : now.getDay();
   const diff = weekday - cur;
   const d = new Date(now);
   d.setDate(now.getDate() + diff);
@@ -71,21 +81,61 @@ async function clearMock() {
   await report.checkReminder();
 }
 
+const weekInfo = computed(() => {
+  const now = clock.nowDate();
+  const start = new Date(now);
+  const day = start.getDay() === 0 ? 7 : start.getDay();
+  start.setDate(start.getDate() - day + 2);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const format = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+  return {
+    weekNum: getWeekNumber(now),
+    year: now.getFullYear(),
+    range: `${format(start)} ~ ${format(end)}`,
+  };
+});
+
+function getWeekNumber(d: Date) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil(((+date - +yearStart) / 86400000 + 1) / 7);
+}
+
+const totalTimeText = computed(() => {
+  const totalMin = timer.total ? Math.round(timer.total / 60) : 0;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+});
+
+const completedCount = computed(() => {
+  return report.reportData?.tasks?.filter((t) => t.status === "done").length ?? 0;
+});
+
+function openPlan() {
+  showPlanModal.value = true;
+}
+
+function openReport() {
+  showReportModal.value = true;
+}
+
 onMounted(() => {
   report.checkReminder();
+  plan.loadCurrentWeek();
 });
+
 </script>
 
 <template>
   <div class="timer-view">
-    <!-- 周二未填计划提醒 banner -->
-    <NAlert v-if="report.needsReminder" type="warning" style="margin-bottom: 16px" closable>
-      还未填写本周计划！请前往「本周计划」页面填写后开始番茄钟。
-    </NAlert>
-
-    <!-- dev 模拟时间面板（仅 dev 构建，生产自动隐藏） -->
+    <!-- dev 模拟时间面板（仅 dev 构建且未设置 VITE_HIDE_DEV_PANEL 时显示，生产自动隐藏） -->
     <NCard
-      v-if="isDev"
+      v-if="showDevPanel"
       size="small"
       title="模拟时间（仅 dev）"
       style="margin-bottom: 16px"
@@ -115,7 +165,17 @@ onMounted(() => {
       </NSpace>
     </NCard>
 
-    <div class="timer-center">
+    <div class="main-card">
+      <h1 class="app-title">工作周报助手</h1>
+
+      <div class="ring-wrapper">
+        <CountdownRing
+          :progress="timer.phase === 'idle' ? 1 : timer.progress"
+          :display="timer.minutesDisplay"
+          :phase="timer.phase"
+        />
+      </div>
+
       <!-- 预设切换 -->
       <div class="preset-row">
         <NButtonGroup size="small">
@@ -130,96 +190,209 @@ onMounted(() => {
             {{ p.label }}
           </NButton>
         </NButtonGroup>
-        <span class="preset-hint">
-          {{ timer.preset.focusMin }}分钟专注 / {{ timer.preset.breakMin }}分钟休息
-        </span>
       </div>
-
-      <!-- 倒计时圆环 -->
-      <CountdownRing
-        :progress="timer.progress"
-        :display="timer.minutesDisplay"
-        :phase="timer.phase"
-      />
 
       <!-- 控制按钮 -->
       <div class="control-row">
         <template v-if="timer.phase === 'idle'">
-          <NButton type="primary" size="large" @click="timer.startFocus()">
-            开始专注
+          <NButton type="primary" size="large" round @click="timer.startFocus()">
+            <template #icon>
+              <NIcon><PlayOutline /></NIcon>
+            </template>
+            开始
           </NButton>
         </template>
 
         <template v-else-if="timer.phase === 'focus'">
-          <NSpace>
-            <NButton @click="timer.phase === 'focus' ? timer.pause() : timer.resume()">
-              暂停
-            </NButton>
-            <NButton type="warning" @click="timer.reset()">
-              结束
-            </NButton>
-          </NSpace>
+          <NButton type="warning" round @click="timer.manualEnd()">
+            <template #icon>
+              <NIcon><StopOutline /></NIcon>
+            </template>
+            结束
+          </NButton>
         </template>
 
         <template v-else-if="timer.phase === 'break'">
           <NSpace>
-            <NButton type="info" @click="timer.reset()">
+            <NButton type="info" round @click="timer.reset()">
+              <template #icon>
+                <NIcon><RefreshOutline /></NIcon>
+              </template>
               跳过休息
             </NButton>
           </NSpace>
         </template>
       </div>
 
-      <!-- 上一个任务提示 -->
-      <div v-if="timer.lastTaskId != null" class="last-task-hint">
-        上一个时段：
-        <NTag size="small" type="info">
-          {{ timer.lastTaskSource === "planned" ? "计划内" : "计划外" }}
-        </NTag>
+      <!-- 操作按钮 -->
+      <div class="action-buttons">
+        <button class="action-btn" @click="openPlan">
+          <span class="action-icon">📅</span>
+          <span class="action-label">周计划</span>
+        </button>
+        <button class="action-btn primary" @click="openReport">
+          <span class="action-icon">📝</span>
+          <span class="action-label">生成周报</span>
+        </button>
+        <button class="action-btn" disabled title="设置（后续开放）">
+          <span class="action-icon">⚙️</span>
+          <span class="action-label">设置</span>
+        </button>
+      </div>
+
+      <!-- 底部统计 -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <span class="stat-label">第 {{ weekInfo.weekNum }} 周, {{ weekInfo.year }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ completedCount }}</span>
+          <span class="stat-label">已完成</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{{ totalTimeText }}</span>
+          <span class="stat-label">总用时</span>
+        </div>
       </div>
     </div>
 
-    <!-- 选任务弹窗 -->
+    <!-- 弹窗 -->
     <TaskPickerModal @confirm="() => {}" />
+    <PlanInputModal v-model:show="showPlanModal" />
+    <ReportPreviewModal v-model:show="showReportModal" />
   </div>
 </template>
 
 <style scoped>
 .timer-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  overflow-y: auto;
+  background: #f5f7fa;
+}
+
+.main-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+  padding: 32px 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.timer-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
+.app-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 24px;
+}
+
+.ring-wrapper {
+  margin-bottom: 20px;
 }
 
 .preset-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.preset-hint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 20px;
 }
 
 .control-row {
   min-height: 48px;
   display: flex;
   align-items: center;
+  margin-bottom: 28px;
 }
 
-.last-task-hint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.action-btn {
+  width: 88px;
+  height: 72px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+}
+
+.action-btn:hover {
+  background: #f9fafb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn.primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.action-btn.primary:hover {
+  background: #2563eb;
+}
+
+.action-btn:disabled,
+.action-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
+
+.action-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: #f3f4f6;
+}
+
+.action-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.action-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stats-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border-radius: 14px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.stat-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.stat-value {
+  font-weight: 700;
+  color: #111827;
 }
 </style>

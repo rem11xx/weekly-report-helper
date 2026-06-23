@@ -11,7 +11,7 @@ const props = withDefaults(
     phase: "idle" | "focus" | "break";
     radius?: number;
   }>(),
-  { radius: 120 }
+  { radius: 110 }
 );
 
 const circumference = 2 * Math.PI * props.radius;
@@ -22,58 +22,56 @@ const strokeDashoffset = computed(
 const phaseColor = computed(() => {
   switch (props.phase) {
     case "focus":
-      return "#18a058";
+      return "#3b82f6";
     case "break":
-      return "#2080f0";
+      return "#60a5fa";
     default:
-      return "#666";
+      return "#3b82f6";
   }
 });
 
 const phaseLabel = computed(() => {
   switch (props.phase) {
     case "focus":
-      return "专注中";
+      return "专注";
     case "break":
-      return "休息中";
+      return "休息";
     default:
-      return "准备开始";
+      return "专注";
   }
 });
 </script>
 
 <template>
   <div class="countdown-ring">
-    <svg :width="radius * 2 + 20" :height="radius * 2 + 20" class="ring-svg">
+    <svg :width="radius * 2 + 28" :height="radius * 2 + 28" class="ring-svg">
       <!-- 背景圆环 -->
       <circle
-        :cx="radius + 10"
-        :cy="radius + 10"
+        :cx="radius + 14"
+        :cy="radius + 14"
         :r="radius"
         fill="none"
-        stroke="rgba(128,128,128,0.15)"
-        :stroke-width="8"
+        stroke="#e5e7eb"
+        :stroke-width="10"
       />
       <!-- 进度圆环 -->
       <circle
-        :cx="radius + 10"
-        :cy="radius + 10"
+        :cx="radius + 14"
+        :cy="radius + 14"
         :r="radius"
         fill="none"
         :stroke="phaseColor"
-        :stroke-width="8"
+        :stroke-width="10"
         stroke-linecap="round"
         :stroke-dasharray="circumference"
         :stroke-dashoffset="strokeDashoffset"
-        transform="rotate(-90, cx, cy)"
+        :transform="`rotate(-90, ${radius + 14}, ${radius + 14})`"
         style="transition: stroke-dashoffset 0.3s ease"
       />
     </svg>
     <div class="center-content">
-      <div class="phase-label" :style="{ color: phaseColor }">
-        {{ phaseLabel }}
-      </div>
-      <div class="time-display">{{ display || "00:00" }}</div>
+      <div class="time-display" :style="{ color: phaseColor }">{{ display || "25:00" }}</div>
+      <div class="phase-label">{{ phaseLabel }}</div>
     </div>
   </div>
 </template>
@@ -99,13 +97,14 @@ const phaseLabel = computed(() => {
 }
 
 .phase-label {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #4b5563;
+  margin-top: 4px;
 }
 
 .time-display {
-  font-size: 42px;
+  font-size: 56px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 2px;
