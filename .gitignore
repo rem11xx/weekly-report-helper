@@ -42,3 +42,6 @@ yarn-error.log*
 
 # Local Claude settings (user-specific)
 .claude/settings.local.json
+
+# Local workspace data
+.workbuddy/
