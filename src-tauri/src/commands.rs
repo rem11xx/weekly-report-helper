@@ -374,22 +374,19 @@ pub fn carry_over_tasks(
         .map_err(s)?;
     }
 
-    // 2. 推算下周 week_start/end
-    let (this_start, this_end): (String, String) = conn
+    // 2. 推算下周 week_start（ensure_week_id 内部按 week_start 自行重算 week_end）
+    let this_start: String = conn
         .query_row(
-            "SELECT week_start, week_end FROM weeks WHERE id = ?1",
+            "SELECT week_start FROM weeks WHERE id = ?1",
             params![req.week_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| row.get(0),
         )
         .map_err(s)?;
 
     use chrono::NaiveDate;
     let next_start_date =
         NaiveDate::parse_from_str(&this_start, "%Y-%m-%d").map_err(s)? + chrono::Duration::days(7);
-    let next_end_date =
-        NaiveDate::parse_from_str(&this_end, "%Y-%m-%d").map_err(s)? + chrono::Duration::days(7);
     let next_start = next_start_date.format("%Y-%m-%d").to_string();
-    let next_end = next_end_date.format("%Y-%m-%d").to_string();
 
     let next_week_id = ensure_week_id(&conn, &next_start)?;
 
