@@ -123,7 +123,7 @@ function confirm() {
 
 .guide-lead {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.78);
+  color: #1f2937;
   margin-bottom: 8px;
 }
 
@@ -139,11 +139,11 @@ function confirm() {
   gap: 8px;
   font-size: 12px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(0, 0, 0, 0.62);
 }
 
 .legend-text b {
-  color: rgba(255, 255, 255, 0.92);
+  color: #111827;
   font-weight: 600;
 }
 
@@ -153,7 +153,7 @@ function confirm() {
   height: 14px;
   margin-top: 2px;
   border-radius: 3px;
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border: 1.5px solid rgba(0, 0, 0, 0.4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -168,12 +168,12 @@ function confirm() {
 .guide-foot {
   margin-top: 10px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .empty-tip {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(0, 0, 0, 0.5);
   margin: 24px 0;
   text-align: center;
 }
