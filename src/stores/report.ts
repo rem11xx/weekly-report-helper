@@ -12,6 +12,7 @@ import type { ReportData } from "@/types";
 export const useReportStore = defineStore("report", () => {
   const reportData = ref<ReportData | null>(null);
   const markdown = ref("");
+  const previewText = ref("");
   const loading = ref(false);
   const showCarryOver = ref(false);
   const needsReminder = ref(false);
@@ -49,8 +50,10 @@ export const useReportStore = defineStore("report", () => {
         }
       }
       nextMondayChecks.value = checks;
-      // 有任务即弹顺延弹窗，使「确认」在所有任务已完结时也可达
-      showCarryOver.value = reportData.value.tasks.length > 0;
+      // 仅当存在未完成任务时才弹「确认任务完成情况」；全部已完成则直接进预览
+      showCarryOver.value = reportData.value.tasks.some(
+        (t) => t.status === "in_progress" || t.status === "not_started"
+      );
     } catch (e) {
       console.error("加载周报数据失败", e);
     } finally {
@@ -68,22 +71,24 @@ export const useReportStore = defineStore("report", () => {
     showCarryOver.value = false;
   }
 
-  /** 确认顺延 → 渲染纯文本周报并复制到剪贴板（需求 #5） */
-  async function confirmAndCopy(weekId: number): Promise<boolean> {
+  /** 确认顺延 → 保存勾选并渲染纯文本周报到 previewText（不复制、不关闭）。
+   *  调用方随后展示预览，由预览界面的「确认」触发复制。 */
+  async function renderPreview(weekId: number) {
     try {
       // 1. 保存顺延
       await carryOverTasks({ week_id: weekId, next_monday_task_ids: collectCheckedIds() });
       // 2. 重新渲染（后端已更新 plan_next_monday），并去掉 Markdown 标题标记转纯文本
       const md = await renderReportMarkdown(weekId);
-      const plain = md.replace(/^#{1,6}\s+/gm, "");
-      // 3. 复制到剪贴板
-      await writeClipboard(plain);
+      previewText.value = md.replace(/^#{1,6}\s+/gm, "");
       showCarryOver.value = false;
-      return true;
     } catch (e) {
-      console.error("生成/复制周报失败", e);
-      return false;
+      console.error("生成周报预览失败", e);
     }
+  }
+
+  /** 复制预览文本到剪贴板（预览界面「确认」调用） */
+  async function copyPreview() {
+    await writeClipboard(previewText.value);
   }
 
   /** 确认顺延勾选并渲染最终 Markdown（ReportView 页用） */
@@ -133,13 +138,15 @@ export const useReportStore = defineStore("report", () => {
   return {
     reportData,
     markdown,
+    previewText,
     loading,
     showCarryOver,
     nextMondayChecks,
     needsReminder,
     loadReport,
     saveCarryOver,
-    confirmAndCopy,
+    renderPreview,
+    copyPreview,
     confirmAndRender,
     copyToClipboard,
     saveToFile,
