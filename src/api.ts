@@ -93,9 +93,12 @@ export function getReportData(weekId: number): Promise<ReportData> {
   return invoke<ReportData>("get_report_data", { weekId });
 }
 
-/** 周五勾选顺延：将勾选的标记为 next_monday，其余进行中/未开始自动进下周计划 */
+/** 周五勾选顺延：将勾选的标记为 next_monday，其余进行中/未开始自动进下周计划。
+ *  后端签名为单结构体参数 `req: CarryOverRequest`，Tauri v2 按参数名（camelCase 即 `req`）
+ *  取 key，故必须整体包成 `{ req }` 传递；不能展开（展开后 `body.get("req")` 缺失会 reject）。
+ *  `CarryOverRequest` 字段保持 snake_case 与后端模型一致，由结构体自身 Deserialize 按字段名解析。 */
 export function carryOverTasks(req: CarryOverRequest): Promise<CarryOverResult> {
-  return invoke<CarryOverResult>("carry_over_tasks", { ...req });
+  return invoke<CarryOverResult>("carry_over_tasks", { req });
 }
 
 /** 渲染 Markdown 周报文本 */
