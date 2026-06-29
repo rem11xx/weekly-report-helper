@@ -9,7 +9,7 @@ use tauri::State;
 
 use crate::db::DbState;
 use crate::models::*;
-use crate::parser::{current_week_range, mock_now, parse_plan};
+use crate::parser::{current_week_range, mock_now, parse_plan as parse_plan_text};
 use crate::report::{build_report_data, render_markdown};
 
 /// 统一把 rusqlite::Error / anyhow::Error 转 String（Tauri v2 要求 Err 实现 Serialize）
@@ -39,14 +39,14 @@ fn ensure_week_id(conn: &rusqlite::Connection, week_start: &str) -> Result<i64, 
 
 /// 仅解析文本，不落库（供输入页实时预览）
 #[tauri::command]
-pub fn parse_plan_cmd(raw: String) -> ParsedPlan {
-    parse_plan(&raw)
+pub fn parse_plan(raw: String) -> ParsedPlan {
+    parse_plan_text(&raw)
 }
 
 /// 保存周计划：解析 + 落库（upsert week + 重建 planned_tasks）
 #[tauri::command]
 pub fn save_week_plan(state: State<'_, DbState>, raw: String) -> Result<Week, String> {
-    let parsed = parse_plan(&raw);
+    let parsed = parse_plan_text(&raw);
     let conn = state.0.lock().unwrap();
 
     let (week_start, week_end) = (parsed.week_start.clone(), parsed.week_end.clone());
@@ -142,7 +142,7 @@ pub fn get_current_week(state: State<'_, DbState>) -> Result<CurrentWeek, String
         Some(wid) => {
             let mut stmt = conn
                 .prepare(
-                    "SELECT id, week_id, COALESCE(project,''), title, sort_order, estimate_d, carried_from
+                    "SELECT id, week_id, COALESCE(project,''), title, sort_order, estimate_d, carried_from, done
                      FROM planned_tasks WHERE week_id = ?1 ORDER BY sort_order",
                 )
                 .map_err(s)?;
@@ -155,6 +155,7 @@ pub fn get_current_week(state: State<'_, DbState>) -> Result<CurrentWeek, String
                     sort_order: row.get(4)?,
                     estimate_d: row.get(5)?,
                     carried_from: row.get(6)?,
+                    done: row.get::<_, i64>(7)? != 0,
                 })
             }).map_err(s)?;
             rows.filter_map(|r| r.ok()).collect()
@@ -162,12 +163,12 @@ pub fn get_current_week(state: State<'_, DbState>) -> Result<CurrentWeek, String
         None => vec![],
     };
 
-    let adhoc = match week_id_opt {
+    let mut adhoc = match week_id_opt {
         Some(wid) => {
             let mut stmt = conn
                 .prepare(
-                    "SELECT id, week_id, COALESCE(project,''), title, created_at
-                     FROM adhoc_tasks WHERE week_id = ?1 ORDER BY created_at",
+                    "SELECT id, week_id, COALESCE(project,''), title, sort_order, done, created_at
+                     FROM adhoc_tasks WHERE week_id = ?1 ORDER BY sort_order, created_at",
                 )
                 .map_err(s)?;
             let rows = stmt.query_map(params![wid], |row| {
@@ -176,13 +177,41 @@ pub fn get_current_week(state: State<'_, DbState>) -> Result<CurrentWeek, String
                     week_id: row.get(1)?,
                     project: row.get(2)?,
                     title: row.get(3)?,
-                    created_at: row.get(4)?,
+                    sort_order: row.get(4)?,
+                    done: row.get::<_, i64>(5)? != 0,
+                    created_at: row.get(6)?,
                 })
             }).map_err(s)?;
             rows.filter_map(|r| r.ok()).collect()
         }
         None => vec![],
     };
+
+    // 归一化历史 adhoc 任务序号：旧库迁移后仍为默认 9999，这里补上真实序号并落库（幂等）
+    let legacy: Vec<usize> = adhoc
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.sort_order >= 9999)
+        .map(|(i, _)| i)
+        .collect();
+    if !legacy.is_empty() {
+        let max_sort = planned
+            .iter()
+            .map(|t| t.sort_order)
+            .chain(adhoc.iter().map(|t| t.sort_order))
+            .filter(|&s| s < 9999)
+            .max()
+            .unwrap_or(0);
+        let mut next = max_sort + 1;
+        for i in legacy {
+            adhoc[i].sort_order = next;
+            let _ = conn.execute(
+                "UPDATE adhoc_tasks SET sort_order = ?1 WHERE id = ?2",
+                params![next, adhoc[i].id],
+            );
+            next += 1;
+        }
+    }
 
     Ok(CurrentWeek { week, planned, adhoc })
 }
@@ -207,7 +236,7 @@ pub fn get_task_options(state: State<'_, DbState>) -> Result<Vec<TaskOption>, St
     if let Some(wid) = week_id_opt {
         let mut stmt = conn
             .prepare(
-                "SELECT id, COALESCE(project,''), title FROM planned_tasks WHERE week_id = ?1 ORDER BY sort_order",
+                "SELECT id, COALESCE(project,''), title FROM planned_tasks WHERE week_id = ?1 AND done = 0 ORDER BY sort_order",
             )
             .map_err(s)?;
         let rows = stmt.query_map(params![wid], |row| {
@@ -223,7 +252,7 @@ pub fn get_task_options(state: State<'_, DbState>) -> Result<Vec<TaskOption>, St
         }
 
         let mut stmt2 = conn
-            .prepare("SELECT id, COALESCE(project,''), title FROM adhoc_tasks ORDER BY created_at DESC")
+            .prepare("SELECT id, COALESCE(project,''), title FROM adhoc_tasks WHERE done = 0 ORDER BY created_at DESC")
             .map_err(s)?;
         let rows2 = stmt2.query_map([], |row| {
             Ok(TaskOption {
@@ -272,23 +301,86 @@ pub fn list_projects(state: State<'_, DbState>) -> Result<Vec<String>, String> {
     Ok(set.into_iter().collect())
 }
 
-/// 新建计划外任务
+/// 新建计划外任务（序号自动续编 = 本周 planned+adhoc 最大序号 + 1）
 #[tauri::command]
 pub fn create_adhoc_task(
     state: State<'_, DbState>,
     project: String,
     title: String,
-) -> Result<i64, String> {
+) -> Result<AdhocTask, String> {
     let conn = state.0.lock().unwrap();
     let (week_start, _) = current_week_range();
     let week_id = ensure_week_id(&conn, &week_start)?;
 
+    let max_sort: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) FROM (
+                SELECT sort_order FROM planned_tasks WHERE week_id = ?1
+                UNION ALL
+                SELECT sort_order FROM adhoc_tasks WHERE week_id = ?1
+            )",
+            params![week_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    let sort_order = max_sort + 1;
+
     conn.execute(
-        "INSERT INTO adhoc_tasks (week_id, project, title) VALUES (?1, ?2, ?3)",
-        params![week_id, project, title],
+        "INSERT INTO adhoc_tasks (week_id, project, title, sort_order, done) VALUES (?1, ?2, ?3, ?4, 0)",
+        params![week_id, project, title, sort_order],
     )
     .map_err(s)?;
-    Ok(conn.last_insert_rowid())
+    let id = conn.last_insert_rowid();
+
+    let task = conn
+        .query_row(
+            "SELECT id, week_id, COALESCE(project,''), title, sort_order, done, created_at
+             FROM adhoc_tasks WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(AdhocTask {
+                    id: row.get(0)?,
+                    week_id: row.get(1)?,
+                    project: row.get(2)?,
+                    title: row.get(3)?,
+                    sort_order: row.get(4)?,
+                    done: row.get::<_, i64>(5)? != 0,
+                    created_at: row.get(6)?,
+                })
+            },
+        )
+        .map_err(s)?;
+    Ok(task)
+}
+
+/// 更新单个任务的内容 / 序号 / 完成态（计划内或计划外通用）
+#[tauri::command]
+pub fn update_task(
+    state: State<'_, DbState>,
+    source: String,
+    id: i64,
+    title: String,
+    sort_order: i64,
+    done: bool,
+) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let done_i: i64 = if done { 1 } else { 0 };
+    match source.as_str() {
+        "planned" => conn
+            .execute(
+                "UPDATE planned_tasks SET title = ?1, sort_order = ?2, done = ?3 WHERE id = ?4",
+                params![title, sort_order, done_i, id],
+            )
+            .map_err(s)?,
+        "adhoc" => conn
+            .execute(
+                "UPDATE adhoc_tasks SET title = ?1, sort_order = ?2, done = ?3 WHERE id = ?4",
+                params![title, sort_order, done_i, id],
+            )
+            .map_err(s)?,
+        other => return Err(format!("未知任务来源: {}", other)),
+    };
+    Ok(())
 }
 
 /// 记录一条番茄钟 session
@@ -347,7 +439,7 @@ pub fn list_sessions(
 
 /// 获取周报统计原始数据
 #[tauri::command]
-pub fn get_report_data_cmd(
+pub fn get_report_data(
     state: State<'_, DbState>,
     week_id: i64,
 ) -> Result<ReportData, String> {
@@ -398,6 +490,17 @@ pub fn carry_over_tasks(
             continue;
         }
         if matches!(t.status, TaskStatus::InProgress | TaskStatus::NotStarted) {
+            // 幂等守卫：本周该任务已顺延到下周则跳过，避免「关闭即保存」重复插入下周任务
+            let already: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM planned_tasks WHERE week_id = ?1 AND carried_from = ?2",
+                    params![next_week_id, t.task_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
+            if already > 0 {
+                continue;
+            }
             conn.execute(
                 "INSERT INTO planned_tasks (week_id, project, title, sort_order, estimate_d, carried_from)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -463,6 +566,33 @@ pub fn needs_plan_reminder(state: State<'_, DbState>) -> Result<bool, String> {
         )
         .unwrap_or(0);
     Ok(count == 0)
+}
+
+/// 【dev】清空本周全部数据：删除本周 planned_tasks / adhoc_tasks / pomodoro_sessions，并置空 plan_raw。
+/// 回到无计划输入态，便于反复调试。番茄钟记录一并清掉，得到干净起点。
+#[tauri::command]
+pub fn clear_week_data(state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let (week_start, _) = current_week_range();
+    let week_id_opt: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM weeks WHERE week_start = ?1",
+            params![week_start],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(wid) = week_id_opt else {
+        return Ok(());
+    };
+    conn.execute("DELETE FROM pomodoro_sessions WHERE week_id = ?1", params![wid])
+        .map_err(s)?;
+    conn.execute("DELETE FROM adhoc_tasks WHERE week_id = ?1", params![wid])
+        .map_err(s)?;
+    conn.execute("DELETE FROM planned_tasks WHERE week_id = ?1", params![wid])
+        .map_err(s)?;
+    conn.execute("UPDATE weeks SET plan_raw = NULL WHERE id = ?1", params![wid])
+        .map_err(s)?;
+    Ok(())
 }
 
 /// 【dev】注入模拟当前时间，用于在界面上测试不同时间点（周二提醒/周五报告/周一归属）。

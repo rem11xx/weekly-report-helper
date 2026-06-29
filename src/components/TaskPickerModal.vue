@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useTimerStore } from "@/stores/timer";
 import type { TaskOption } from "@/types";
 import {
@@ -41,6 +41,17 @@ const defaultKey = computed(() => {
 onMounted(() => {
   selectedKey.value = defaultKey.value;
 });
+
+/** 弹窗每次打开时清空上次填写的新建任务表单（组件常驻挂载，输入会保留） */
+watch(
+  () => store.showTaskPicker,
+  (show) => {
+    if (show) {
+      newProject.value = "";
+      newTitle.value = "";
+    }
+  }
+);
 
 /** 确认选择 */
 function confirm() {
@@ -96,7 +107,7 @@ const groupedOptions = computed(() => {
 
         <!-- 新建任务选项 -->
         <NRadio value="__new__" class="new-task-radio">
-          <span style="font-weight: 600">+ 新建任务</span>
+          <span style="font-weight: 600">新建任务</span>
         </NRadio>
       </NRadioGroup>
 
@@ -110,7 +121,7 @@ const groupedOptions = computed(() => {
         />
         <NInput
           v-model:value="newTitle"
-          placeholder="任务标题"
+          placeholder="任务内容"
           @keyup.enter="confirm"
         />
       </div>

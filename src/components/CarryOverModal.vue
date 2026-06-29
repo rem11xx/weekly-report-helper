@@ -13,6 +13,7 @@ const store = useReportStore();
 
 const emit = defineEmits<{
   (e: "confirm"): void;
+  (e: "close"): void;
 }>();
 
 /** 未完成的任务列表（可勾选 / 不勾选） */
@@ -34,12 +35,17 @@ function confirm() {
     preset="card"
     title="确认任务完成情况"
     style="width: 560px; max-width: 90vw"
-    :mask-closable="false"
+    :mask-closable="true"
     :closable="false"
+    @update:show="(v: boolean) => { if (!v) emit('close') }"
   >
     <div class="carryover-modal">
       <p class="hint">
         以下未完成任务，勾选表示「计划下周一完成」（计入本周），未勾选将顺延到下周计划。
+      </p>
+
+      <p v-if="unfinishedTasks.length === 0" class="empty-tip">
+        本周任务均已完结，无需顺延。
       </p>
 
       <div
@@ -66,7 +72,8 @@ function confirm() {
 
     <template #footer>
       <NSpace justify="end">
-        <NButton type="primary" @click="confirm">确认并生成周报</NButton>
+        <NButton @click="emit('close')">关闭</NButton>
+        <NButton type="primary" @click="confirm">确认</NButton>
       </NSpace>
     </template>
   </NModal>
@@ -82,6 +89,13 @@ function confirm() {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
   margin-bottom: 16px;
+}
+
+.empty-tip {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 24px 0;
+  text-align: center;
 }
 
 .carryover-item {

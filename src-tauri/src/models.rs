@@ -20,6 +20,7 @@ pub struct PlannedTask {
     pub sort_order: i64,
     pub estimate_d: f64,
     pub carried_from: Option<i64>,
+    pub done: bool,
 }
 
 /// 计划外任务
@@ -29,6 +30,8 @@ pub struct AdhocTask {
     pub week_id: i64,
     pub project: String,
     pub title: String,
+    pub sort_order: i64,
+    pub done: bool,
     pub created_at: String,
 }
 

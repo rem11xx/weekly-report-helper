@@ -17,19 +17,21 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::parse_plan_cmd,
+            commands::parse_plan,
             commands::save_week_plan,
             commands::get_current_week,
             commands::get_task_options,
             commands::list_projects,
             commands::create_adhoc_task,
+            commands::update_task,
             commands::record_session,
             commands::list_sessions,
-            commands::get_report_data_cmd,
+            commands::get_report_data,
             commands::carry_over_tasks,
             commands::render_report_markdown,
             commands::save_report_file,
             commands::needs_plan_reminder,
+            commands::clear_week_data,
             commands::set_mock_now,
             commands::clear_mock_now,
         ])

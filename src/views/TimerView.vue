@@ -16,6 +16,8 @@ import {
   NDatePicker,
   NCard,
   NIcon,
+  useDialog,
+  useMessage,
 } from "naive-ui";
 import {
   PlayOutline,
@@ -81,6 +83,23 @@ async function clearMock() {
   await report.checkReminder();
 }
 
+const dialog = useDialog();
+const message = useMessage();
+
+/** 【dev】清空本周计划：确认后删除本周全部任务及番茄钟记录 */
+function confirmClearPlan() {
+  dialog.warning({
+    title: "清空本周计划",
+    content: "将清空本周全部计划内/计划外任务及番茄钟记录，不可恢复，确认？",
+    positiveText: "确认清空",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      await plan.clearWeekDataAll();
+      message.success("已清空");
+    },
+  });
+}
+
 const weekInfo = computed(() => {
   const now = clock.nowDate();
   const start = new Date(now);
@@ -124,6 +143,13 @@ function openReport() {
   showReportModal.value = true;
 }
 
+/** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作 */
+function onRingClick() {
+  if (timer.phase === "idle") timer.startFocus();
+  else if (timer.phase === "focus") timer.manualEnd();
+  else if (timer.phase === "break") timer.reset();
+}
+
 onMounted(() => {
   report.checkReminder();
   plan.loadCurrentWeek();
@@ -163,12 +189,15 @@ onMounted(() => {
         <NButton size="tiny" tertiary @click="quickSet(1, 9, 0)">周一 09:00（归上周）</NButton>
         <NButton size="tiny" tertiary @click="quickSet(3, 10, 0)">周三 10:00</NButton>
       </NSpace>
+      <NSpace style="margin-top: 8px" size="small">
+        <NButton size="tiny" type="error" tertiary @click="confirmClearPlan">
+          清空本周计划（含番茄钟记录）
+        </NButton>
+      </NSpace>
     </NCard>
 
     <div class="main-card">
-      <h1 class="app-title">工作周报助手</h1>
-
-      <div class="ring-wrapper">
+      <div class="ring-wrapper" @click="onRingClick">
         <CountdownRing
           :progress="timer.phase === 'idle' ? 1 : timer.progress"
           :display="timer.minutesDisplay"
@@ -226,11 +255,11 @@ onMounted(() => {
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <button class="action-btn" @click="openPlan">
+        <button class="action-btn" :class="{ active: showPlanModal }" @click="openPlan">
           <span class="action-icon">📅</span>
           <span class="action-label">周计划</span>
         </button>
-        <button class="action-btn primary" @click="openReport">
+        <button class="action-btn" :class="{ active: showReportModal }" @click="openReport">
           <span class="action-icon">📝</span>
           <span class="action-label">生成周报</span>
         </button>
@@ -289,13 +318,6 @@ onMounted(() => {
   align-items: center;
 }
 
-.app-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 24px;
-}
-
 .ring-wrapper {
   margin-bottom: 20px;
 }
@@ -339,13 +361,13 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.action-btn.primary {
+.action-btn.active {
   background: #3b82f6;
   border-color: #3b82f6;
   color: #ffffff;
 }
 
-.action-btn.primary:hover {
+.action-btn.active:hover {
   background: #2563eb;
 }
 

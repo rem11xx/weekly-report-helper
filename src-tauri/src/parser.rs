@@ -398,4 +398,40 @@ mod tests {
         assert_eq!(start.format("%Y-%m-%d").to_string(), "2024-06-11");
         assert_eq!(end.format("%Y-%m-%d").to_string(), "2024-06-17");
     }
+
+    #[test]
+    fn estimate_eaten_when_adjacent_to_cjk() {
+        // 行尾紧贴中文的「1d」应被当作预估时长吃掉：标题截断为「基层治理对接-本周暂排」、estimate=1d。
+        // 「1」前是汉字「排」、无分隔符，原正则用 *（允许零分隔符）故仍匹配。
+        let plan = parse_plan("项目A\n5、基层治理对接-本周暂排1d");
+        assert_eq!(plan.tasks.len(), 1);
+        let t = &plan.tasks[0];
+        assert_eq!(t.title, "基层治理对接-本周暂排");
+        assert_eq!(t.estimate_d, 1.0);
+    }
+
+    #[test]
+    fn full_real_user_input_parses_cleanly() {
+        // 用户实际粘贴的完整文本（含两个项目、带预估/不带预估/紧贴中文 1d 的混合行）。
+        let raw = "省反走私
+1、省反走私系统初始化缉私局的用户体系（美亚线下提供），完成和美亚的单点登录（从美亚系统跳转过来）及剩余警综平台的对接工作
+
+玉环反走私
+1、初始化有问题的区域管控围栏和初始化玉环船舶港口数据（用于船舶画像和大屏上的停留）-0.75d
+2、配合凌琦测试和优化船舶图标时效性问题-0.25d
+3、大华光电设备对接，207光电持续追踪效果优化（基于相同AIS和雷达tarid，位置变化后光电引导调整位置）-1.5d
+4、涉海警情和涉海行政案件模块模块联调并完成上线-0.5d
+5、基层治理对接-本周暂排1d";
+        let plan = parse_plan(raw);
+        assert!(plan.errors.is_empty(), "errors: {:?}", plan.errors);
+        assert_eq!(plan.tasks.len(), 6);
+        // 紧贴中文的 1d 应被当预估吃掉：标题截断、estimate=1d（与既有 0.75d/0.25d 等行同规则）
+        let line5 = plan
+            .tasks
+            .iter()
+            .find(|t| t.title.contains("基层治理"))
+            .unwrap();
+        assert_eq!(line5.title, "基层治理对接-本周暂排");
+        assert_eq!(line5.estimate_d, 1.0);
+    }
 }

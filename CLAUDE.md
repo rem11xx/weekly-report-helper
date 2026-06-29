@@ -18,6 +18,16 @@ User-reported problems are **recorded, not fixed immediately**. The user decides
 - When fixed and self-checked (build/type-check passing), set 状态 `已修复` (note what was done in 备注); when the user confirms it in the running app, set `已关闭` and delete that problem's records (table row + its 方案 section) from `PROBLEMS.md`.
 - Status values: 待处理 / 已修复 / 已关闭. Priority values (高 / 中 / 低) — user-assigned, or assessed by Claude by impact when the user hasn't assigned them.
 
+### Branch workflow for fixes
+Code for a recorded problem is written on a dedicated fix branch, **never directly on `main`**:
+
+- When the user asks to start fixing a problem (e.g. "修 P002"), branch off the current `main` with a name like `fix/P002-<short-slug>` (or batch several `P###` into one `fix/...` branch if the user groups them). Do the work and commit there.
+- Do **not** merge on your own. After committing, report back and wait for the user to confirm in the running app that everything is fixed normally.
+- Once the user confirms, merge the fix branch back into `main`:
+  - **No conflicts** → fast-forward / merge directly, then delete the fix branch.
+  - **Conflicts** → do **not** resolve them unilaterally. Stop, summarize briefly which files/lines conflict and why, and let the user decide how to merge (resolve theirs, resolve ours, manual edit, etc.).
+- One fix branch per fix cycle: it's created when work starts and deleted (or left for the user to handle) once merged — don't accumulate stale fix branches.
+
 ## Commands
 
 Frontend (run from repo root, uses pnpm):

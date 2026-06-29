@@ -8,6 +8,7 @@ import type {
   CarryOverResult,
   Week,
   PomodoroSession,
+  AdhocTask,
 } from "@/types";
 
 /** 解析周计划文本（仅预览，不落库） */
@@ -35,15 +36,35 @@ export function listProjects(): Promise<string[]> {
   return invoke<string[]>("list_projects");
 }
 
-/** 新建计划外任务（番茄钟期间） */
+/** 新建计划外任务（番茄钟期间或周计划表格空行）；返回新建行（含序号） */
 export function createAdhocTask(
   project: string,
   title: string
-): Promise<number> {
-  return invoke<number>("create_adhoc_task", { project, title });
+): Promise<AdhocTask> {
+  return invoke<AdhocTask>("create_adhoc_task", { project, title });
 }
 
-/** 记录一条番茄钟 session */
+/** 更新单个任务的内容 / 序号 / 完成态（计划内或计划外通用）。
+ *  类型保留 snake_case 与后端模型一致；invoke 时顶层参数转 camelCase
+ *  （Tauri v2 默认把 Rust snake_case 参数名映射为 JS camelCase）。 */
+export function updateTask(params: {
+  source: "planned" | "adhoc";
+  id: number;
+  title: string;
+  sort_order: number;
+  done: boolean;
+}): Promise<void> {
+  return invoke<void>("update_task", {
+    source: params.source,
+    id: params.id,
+    title: params.title,
+    sortOrder: params.sort_order,
+    done: params.done,
+  });
+}
+
+/** 记录一条番茄钟 session。
+ *  类型保留 snake_case 与后端模型一致；invoke 时顶层参数转 camelCase。 */
 export function recordSession(params: {
   task_source: "planned" | "adhoc";
   task_id: number | null;
@@ -52,7 +73,14 @@ export function recordSession(params: {
   duration_min: number;
   is_break: boolean;
 }): Promise<number> {
-  return invoke<number>("record_session", params);
+  return invoke<number>("record_session", {
+    taskSource: params.task_source,
+    taskId: params.task_id,
+    startedAt: params.started_at,
+    endedAt: params.ended_at,
+    durationMin: params.duration_min,
+    isBreak: params.is_break,
+  });
 }
 
 /** 获取本周全部番茄钟记录 */
@@ -88,6 +116,11 @@ export function needsPlanReminder(): Promise<boolean> {
 /** 【dev】注入模拟当前时间（ISO 形如 2026-06-17T13:00） */
 export function setMockNow(iso: string): Promise<void> {
   return invoke<void>("set_mock_now", { iso });
+}
+
+/** 【dev】清空本周全部数据（计划内/计划外任务 + 番茄钟记录 + plan_raw），回到无计划输入态 */
+export function clearWeekData(): Promise<void> {
+  return invoke<void>("clear_week_data");
 }
 
 /** 【dev】清除模拟时间，恢复真实系统时间 */

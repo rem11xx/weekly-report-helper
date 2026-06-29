@@ -40,10 +40,22 @@ const phaseLabel = computed(() => {
       return "专注";
   }
 });
+
+/** 圆环可点击，悬停提示随当前阶段变化 */
+const hint = computed(() => {
+  switch (props.phase) {
+    case "focus":
+      return "点击结束专注";
+    case "break":
+      return "点击跳过休息";
+    default:
+      return "点击开始专注";
+  }
+});
 </script>
 
 <template>
-  <div class="countdown-ring">
+  <div class="countdown-ring" :title="hint">
     <svg :width="radius * 2 + 28" :height="radius * 2 + 28" class="ring-svg">
       <!-- 背景圆环 -->
       <circle
@@ -82,6 +94,7 @@ const phaseLabel = computed(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  cursor: pointer;
 }
 
 .ring-svg {

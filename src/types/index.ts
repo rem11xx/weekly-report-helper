@@ -18,6 +18,7 @@ export interface PlannedTask {
   sort_order: number;
   estimate_d: number;
   carried_from: number | null;
+  done: boolean;
 }
 
 /** 计划外任务（番茄钟期间新建） */
@@ -26,6 +27,8 @@ export interface AdhocTask {
   week_id: number;
   project: string;
   title: string;
+  sort_order: number;
+  done: boolean;
   created_at: string;
 }
 

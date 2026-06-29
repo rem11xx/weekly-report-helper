@@ -19,6 +19,23 @@ export const useReportStore = defineStore("report", () => {
   // 周五勾选状态：task_id → 是否勾选 plan_next_monday
   const nextMondayChecks = ref<Record<number, boolean>>({});
 
+  /** 收集当前勾选 plan_next_monday 的 task_id */
+  function collectCheckedIds(): number[] {
+    return Object.entries(nextMondayChecks.value)
+      .filter(([, v]) => v)
+      .map(([k]) => Number(k));
+  }
+
+  /** 写入剪贴板（Tauri 插件优先，失败回退 Web API） */
+  async function writeClipboard(text: string) {
+    try {
+      const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
+      await writeText(text);
+    } catch {
+      await navigator.clipboard.writeText(text);
+    }
+  }
+
   /** 加载周报原始数据（未勾选前） */
   async function loadReport(weekId: number) {
     loading.value = true;
@@ -32,11 +49,8 @@ export const useReportStore = defineStore("report", () => {
         }
       }
       nextMondayChecks.value = checks;
-      // 顺延任务弹窗：如果有未完成的就弹
-      const unfinished = reportData.value.tasks.filter(
-        (t) => t.status === "in_progress" || t.status === "not_started"
-      );
-      showCarryOver.value = unfinished.length > 0;
+      // 有任务即弹顺延弹窗，使「确认」在所有任务已完结时也可达
+      showCarryOver.value = reportData.value.tasks.length > 0;
     } catch (e) {
       console.error("加载周报数据失败", e);
     } finally {
@@ -44,16 +58,39 @@ export const useReportStore = defineStore("report", () => {
     }
   }
 
-  /** 确认顺延勾选并渲染最终 Markdown */
-  async function confirmAndRender(weekId: number) {
-    // 收集勾选 plan_next_monday 的 task_id
-    const ids = Object.entries(nextMondayChecks.value)
-      .filter(([, v]) => v)
-      .map(([k]) => Number(k));
+  /** 保存顺延勾选到库（关闭前调用，需求 #3） */
+  async function saveCarryOver(weekId: number) {
+    try {
+      await carryOverTasks({ week_id: weekId, next_monday_task_ids: collectCheckedIds() });
+    } catch (e) {
+      console.error("顺延保存失败", e);
+    }
+    showCarryOver.value = false;
+  }
 
+  /** 确认顺延 → 渲染纯文本周报并复制到剪贴板（需求 #5） */
+  async function confirmAndCopy(weekId: number): Promise<boolean> {
+    try {
+      // 1. 保存顺延
+      await carryOverTasks({ week_id: weekId, next_monday_task_ids: collectCheckedIds() });
+      // 2. 重新渲染（后端已更新 plan_next_monday），并去掉 Markdown 标题标记转纯文本
+      const md = await renderReportMarkdown(weekId);
+      const plain = md.replace(/^#{1,6}\s+/gm, "");
+      // 3. 复制到剪贴板
+      await writeClipboard(plain);
+      showCarryOver.value = false;
+      return true;
+    } catch (e) {
+      console.error("生成/复制周报失败", e);
+      return false;
+    }
+  }
+
+  /** 确认顺延勾选并渲染最终 Markdown（ReportView 页用） */
+  async function confirmAndRender(weekId: number) {
     try {
       // 调用后端顺延
-      await carryOverTasks({ week_id: weekId, next_monday_task_ids: ids });
+      await carryOverTasks({ week_id: weekId, next_monday_task_ids: collectCheckedIds() });
       showCarryOver.value = false;
 
       // 重新渲染（后端已更新 plan_next_monday 状态）
@@ -63,15 +100,9 @@ export const useReportStore = defineStore("report", () => {
     }
   }
 
-  /** 复制 Markdown 到剪贴板 */
-  async function copyToClipboard() {
-    try {
-      const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
-      await writeText(markdown.value);
-    } catch (e) {
-      // fallback
-      await navigator.clipboard.writeText(markdown.value);
-    }
+  /** 复制到剪贴板（缺省用 markdown；可显式传入纯文本） */
+  async function copyToClipboard(text?: string) {
+    await writeClipboard(text ?? markdown.value);
   }
 
   /** 保存为 .md 文件 */
@@ -107,6 +138,8 @@ export const useReportStore = defineStore("report", () => {
     nextMondayChecks,
     needsReminder,
     loadReport,
+    saveCarryOver,
+    confirmAndCopy,
     confirmAndRender,
     copyToClipboard,
     saveToFile,

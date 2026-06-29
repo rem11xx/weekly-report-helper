@@ -162,8 +162,8 @@ export const useTimerStore = defineStore("timer", () => {
     // 新建计划外任务
     if (source === "adhoc" && finalTaskId === null && newTitle) {
       try {
-        const id = await createAdhocTask(newProject || "", newTitle);
-        finalTaskId = id;
+        const task = await createAdhocTask(newProject || "", newTitle);
+        finalTaskId = task.id;
       } catch (e) {
         console.error("新建计划外任务失败", e);
         return;

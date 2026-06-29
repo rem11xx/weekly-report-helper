@@ -107,62 +107,75 @@ pub fn build_report_data(conn: &Connection, week_id: i64) -> anyhow::Result<Repo
     let mut tasks: Vec<ReportTask> = Vec::new();
     {
         let mut stmt = conn.prepare(
-            "SELECT id, project, title, sort_order, estimate_d, plan_next_monday, carried_from
+            "SELECT id, project, title, sort_order, estimate_d, plan_next_monday, carried_from, done
              FROM planned_tasks WHERE week_id = ?1",
         )?;
         let rows = stmt.query_map(params![week_id], |row| {
+            let task_id: i64 = row.get(0)?;
+            let estimate_d: f64 = row.get(4)?;
+            let plan_next_monday: bool = row.get::<_, i64>(5)? != 0;
+            let done: bool = row.get::<_, i64>(7)? != 0;
+            let actual_min = *minutes_map
+                .get(&("planned".to_string(), task_id))
+                .unwrap_or(&0);
+            let status = if done {
+                TaskStatus::Done
+            } else {
+                determine_status(actual_min, estimate_d, plan_next_monday)
+            };
             Ok(ReportTask {
                 source: "planned".to_string(),
-                task_id: row.get(0)?,
+                task_id,
                 project: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                 title: row.get(2)?,
                 sort_order: row.get(3)?,
-                estimate_d: row.get(4)?,
-                actual_min: 0,
-                actual_d: 0.0,
-                status: TaskStatus::NotStarted,
-                plan_next_monday: row.get::<_, i64>(5)? != 0,
+                estimate_d,
+                actual_min,
+                actual_d: minutes_to_days(actual_min),
+                status,
+                plan_next_monday,
                 carried_from: row.get(6)?,
             })
         })?;
         for r in rows {
-            let mut t: ReportTask = r?;
-            let key = ("planned".to_string(), t.task_id);
-            t.actual_min = *minutes_map.get(&key).unwrap_or(&0);
-            t.actual_d = minutes_to_days(t.actual_min);
-            t.status = determine_status(t.actual_min, t.estimate_d, t.plan_next_monday);
-            tasks.push(t);
+            tasks.push(r?);
         }
     }
 
     // 计划外任务（adhoc）
     {
         let mut stmt = conn.prepare(
-            "SELECT id, project, title, created_at FROM adhoc_tasks WHERE week_id = ?1",
+            "SELECT id, project, title, sort_order, done, created_at FROM adhoc_tasks WHERE week_id = ?1",
         )?;
         let rows = stmt.query_map(params![week_id], |row| {
+            let task_id: i64 = row.get(0)?;
+            let sort_order: i64 = row.get(3)?;
+            let done: bool = row.get::<_, i64>(4)? != 0;
+            let actual_min = *minutes_map
+                .get(&("adhoc".to_string(), task_id))
+                .unwrap_or(&0);
+            // adhoc 任务预估=0；手动勾选完成或走过番茄钟即完成
+            let status = if done {
+                TaskStatus::Done
+            } else {
+                determine_status(actual_min, 0.0, false)
+            };
             Ok(ReportTask {
                 source: "adhoc".to_string(),
-                task_id: row.get(0)?,
+                task_id,
                 project: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                 title: row.get(2)?,
-                sort_order: 9999, // 计划外排在项目末尾
+                sort_order,
                 estimate_d: 0.0,
-                actual_min: 0,
-                actual_d: 0.0,
-                status: TaskStatus::NotStarted,
+                actual_min,
+                actual_d: minutes_to_days(actual_min),
+                status,
                 plan_next_monday: false,
                 carried_from: None,
             })
         })?;
         for r in rows {
-            let mut t: ReportTask = r?;
-            let key = ("adhoc".to_string(), t.task_id);
-            t.actual_min = *minutes_map.get(&key).unwrap_or(&0);
-            t.actual_d = minutes_to_days(t.actual_min);
-            // adhoc 任务预估=0，走过番茄钟即完成
-            t.status = determine_status(t.actual_min, 0.0, false);
-            tasks.push(t);
+            tasks.push(r?);
         }
     }
 
