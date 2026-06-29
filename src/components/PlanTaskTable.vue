@@ -143,12 +143,22 @@ function onDragEnd() {
               'row-done': row.task.done,
               'row-over': overKey === rowKey(gIdx, rIdx),
             }"
-            draggable="true"
-            @dragstart="onDragStart(gIdx, rIdx, $event)"
             @dragover="onDragOver(gIdx, rIdx, $event)"
             @drop="onDrop(gIdx, rIdx, $event)"
-            @dragend="onDragEnd"
           >
+            <td class="cell-handle">
+              <!-- 拖拽把手：draggable 放在把手 <span> 上而非整行 <tr>，
+                   规避 HTML5 DnD 作用在 <tr> 上 dragstart/drop 不触发的问题，
+                   也避免与文本框/勾选框争夺拖拽源。dragover/drop 仍留在 <tr>（整行作放置目标）。 -->
+              <span
+                class="drag-grip"
+                draggable="true"
+                title="拖动排序"
+                @dragstart="onDragStart(gIdx, rIdx, $event)"
+                @dragend="onDragEnd"
+                >⠿</span
+              >
+            </td>
             <td class="cell-seq">
               <div class="seq-inner">
                 <NCheckbox
@@ -183,7 +193,7 @@ function onDragEnd() {
           </tr>
           <!-- 空行：新增归属该项目的计划外任务 -->
           <tr class="row-add">
-            <td colspan="2">
+            <td colspan="3">
               <input
                 class="add-input"
                 :value="newTaskText[group.project] ?? ''"
@@ -228,17 +238,34 @@ function onDragEnd() {
   font-size: 13px;
 }
 
-.task-row {
-  cursor: grab;
-}
-.task-row:active {
-  cursor: grabbing;
-}
-
 .task-row td {
   padding: 4px 8px;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: top;
+}
+
+/* 拖拽把手列：窄列，把 ⠿ 居中靠左 */
+.task-row .cell-handle {
+  width: 26px;
+  padding-left: 10px;
+  padding-right: 2px;
+}
+
+.drag-grip {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  color: #cbd5e1;
+  user-select: none;
+  cursor: grab;
+}
+
+.drag-grip:hover {
+  color: #94a3b8;
+}
+
+.drag-grip:active {
+  cursor: grabbing;
 }
 
 .row-over {
