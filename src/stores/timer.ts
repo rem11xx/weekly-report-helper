@@ -118,6 +118,24 @@ export const useTimerStore = defineStore("timer", () => {
     onTimerEnd();
   }
 
+  /** 【dev】快进到结束前 5 秒：把剩余时间设为 5 秒并保证倒计时在跑，
+   *  5 秒后自然触发「弹窗选任务 → 记录 session → 进休息」流程。
+   *  对专注阶段额外把 focusStartAt 前移到 (total-5) 秒前，使 5 秒后结束时
+   *  记录的 session 时长 ≈ 预设时长（25/50min），从而一并验证分钟数/状态判定等时长逻辑。
+   *  休息阶段无需调整：break 时长直接取预设 breakMin，与墙钟无关。 */
+  function fastForwardToEnd() {
+    if (phase.value === "idle") return;
+    if (remaining.value <= 5) return; // 已不足 5 秒则不动，避免倒退
+    if (phase.value === "focus") {
+      // 假装专注是在 (total-5) 秒前开始的：结束时刻 - 此刻 = total 秒 = 预设时长
+      const start = clock.nowDate();
+      start.setSeconds(start.getSeconds() - (total.value - 5));
+      focusStartAt.value = start.toISOString();
+    }
+    remaining.value = 5;
+    startTick(); // 即便之前是暂停状态，也保证 5 秒后能触发自然结束
+  }
+
   /** 计时结束处理 */
   async function onTimerEnd() {
     if (phase.value === "focus") {
@@ -229,6 +247,7 @@ export const useTimerStore = defineStore("timer", () => {
     resume,
     reset,
     manualEnd,
+    fastForwardToEnd,
     selectTask,
     loadTaskOptions,
   };

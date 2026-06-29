@@ -190,6 +190,15 @@ onMounted(() => {
         <NButton size="tiny" tertiary @click="quickSet(3, 10, 0)">周三 10:00</NButton>
       </NSpace>
       <NSpace style="margin-top: 8px" size="small">
+        <NButton
+          size="tiny"
+          type="warning"
+          tertiary
+          :disabled="timer.phase === 'idle' || timer.remaining <= 5"
+          @click="timer.fastForwardToEnd()"
+        >
+          快进到结束前5秒
+        </NButton>
         <NButton size="tiny" type="error" tertiary @click="confirmClearPlan">
           清空本周计划（含番茄钟记录）
         </NButton>
