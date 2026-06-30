@@ -448,16 +448,20 @@ pub fn get_report_data(
 }
 
 /// 周五勾选顺延：
-/// - 勾选的标记 plan_next_monday=1
-/// - 进行中 + 未开始自动进下周计划（carried_from 记录本周 task_id）
+/// - 勾选的任务标记 plan_next_monday=1（决定其在周报中显示为「计划下周一完成」）
+///
+/// 设计（P017）：顺延任务**仅作为本周周报的「下周计划」项呈现**——由 render_markdown
+/// 从本周 in_progress/not_started 任务状态推导，不读下周 planned_tasks。此处**不再**把
+/// 未完成任务预填进下周 planned_tasks：下周二由用户用新文本解析强制生成本周任务，
+/// 避免上周未完成项把新一周的输入入口顶成「已有计划」表格态而无法重录。
 #[tauri::command]
 pub fn carry_over_tasks(
     state: State<'_, DbState>,
     req: CarryOverRequest,
-) -> Result<CarryOverResult, String> {
+) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
 
-    // 1. 标记 plan_next_monday
+    // 勾选的任务标记 plan_next_monday=1（用于周报状态判定）
     for id in &req.next_monday_task_ids {
         conn.execute(
             "UPDATE planned_tasks SET plan_next_monday = 1 WHERE id = ?1 AND week_id = ?2",
@@ -466,62 +470,7 @@ pub fn carry_over_tasks(
         .map_err(s)?;
     }
 
-    // 2. 推算下周 week_start（ensure_week_id 内部按 week_start 自行重算 week_end）
-    let this_start: String = conn
-        .query_row(
-            "SELECT week_start FROM weeks WHERE id = ?1",
-            params![req.week_id],
-            |row| row.get(0),
-        )
-        .map_err(s)?;
-
-    use chrono::NaiveDate;
-    let next_start_date =
-        NaiveDate::parse_from_str(&this_start, "%Y-%m-%d").map_err(s)? + chrono::Duration::days(7);
-    let next_start = next_start_date.format("%Y-%m-%d").to_string();
-
-    let next_week_id = ensure_week_id(&conn, &next_start)?;
-
-    // 3. 进行中 + 未开始 的 planned 任务写入下周
-    let data = build_report_data(&conn, req.week_id).map_err(s)?;
-    let mut carried = 0i64;
-    for t in &data.tasks {
-        if t.source != "planned" {
-            continue;
-        }
-        if matches!(t.status, TaskStatus::InProgress | TaskStatus::NotStarted) {
-            // 幂等守卫：本周该任务已顺延到下周则跳过，避免「关闭即保存」重复插入下周任务
-            let already: i64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM planned_tasks WHERE week_id = ?1 AND carried_from = ?2",
-                    params![next_week_id, t.task_id],
-                    |row| row.get(0),
-                )
-                .unwrap_or(0);
-            if already > 0 {
-                continue;
-            }
-            conn.execute(
-                "INSERT INTO planned_tasks (week_id, project, title, sort_order, estimate_d, carried_from)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    next_week_id,
-                    t.project,
-                    t.title,
-                    t.sort_order,
-                    t.estimate_d,
-                    t.task_id
-                ],
-            )
-            .map_err(s)?;
-            carried += 1;
-        }
-    }
-
-    Ok(CarryOverResult {
-        next_week_id,
-        carried_count: carried,
-    })
+    Ok(())
 }
 
 /// 渲染 Markdown 周报

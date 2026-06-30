@@ -123,10 +123,3 @@ pub struct CarryOverRequest {
     pub week_id: i64,
     pub next_monday_task_ids: Vec<i64>,
 }
-
-/// 顺延结果
-#[derive(Debug, Clone, Serialize)]
-pub struct CarryOverResult {
-    pub next_week_id: i64,
-    pub carried_count: i64,
-}

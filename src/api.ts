@@ -5,7 +5,6 @@ import type {
   TaskOption,
   ReportData,
   CarryOverRequest,
-  CarryOverResult,
   Week,
   PomodoroSession,
   AdhocTask,
@@ -97,8 +96,8 @@ export function getReportData(weekId: number): Promise<ReportData> {
  *  后端签名为单结构体参数 `req: CarryOverRequest`，Tauri v2 按参数名（camelCase 即 `req`）
  *  取 key，故必须整体包成 `{ req }` 传递；不能展开（展开后 `body.get("req")` 缺失会 reject）。
  *  `CarryOverRequest` 字段保持 snake_case 与后端模型一致，由结构体自身 Deserialize 按字段名解析。 */
-export function carryOverTasks(req: CarryOverRequest): Promise<CarryOverResult> {
-  return invoke<CarryOverResult>("carry_over_tasks", { req });
+export function carryOverTasks(req: CarryOverRequest): Promise<void> {
+  return invoke<void>("carry_over_tasks", { req });
 }
 
 /** 渲染 Markdown 周报文本 */

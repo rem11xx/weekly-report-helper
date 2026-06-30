@@ -108,12 +108,6 @@ export interface CarryOverRequest {
   week_id: number;
   // 状态为 next_monday 的任务（番茄钟未达预估，由用户勾选的）
   next_monday_task_ids: number[];
-  // 顺延到下周的：未开始 + 进行中（这些自动进下周计划）
-  // 后端会自动处理，前端只传 next_monday 勾选
-}
-
-/** 顺延结果 */
-export interface CarryOverResult {
-  next_week_id: number;
-  carried_count: number;
+  // 顺延任务仅作为本周周报「下周计划」项呈现（后端从本周任务状态推导），
+  // 不再预填进下周 planned_tasks；下周二由新文本解析生成本周任务（P017）。
 }
