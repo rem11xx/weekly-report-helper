@@ -5,7 +5,7 @@
 //! 内部 anyhow 错误通过 map_err 转字符串。
 
 use rusqlite::params;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use crate::db::DbState;
 use crate::models::*;
@@ -33,6 +33,44 @@ fn ensure_week_id(conn: &rusqlite::Connection, week_start: &str) -> Result<i64, 
         Ok(conn.last_insert_rowid())
     })
     .map_err(s)
+}
+
+// ============ 设置 ============
+
+/// 读取窗口置顶设置
+#[tauri::command]
+pub fn get_always_on_top(state: State<'_, DbState>) -> Result<bool, String> {
+    let conn = state.0.lock().unwrap();
+    let flag: i64 = conn
+        .query_row(
+            "SELECT always_on_top FROM app_settings WHERE id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    Ok(flag != 0)
+}
+
+/// 设置窗口置顶（写库 + 应用到主窗口）
+#[tauri::command]
+pub fn set_always_on_top(
+    state: State<'_, DbState>,
+    app: AppHandle,
+    always_on_top: bool,
+) -> Result<(), String> {
+    let flag: i64 = if always_on_top { 1 } else { 0 };
+    {
+        let conn = state.0.lock().unwrap();
+        conn.execute(
+            "UPDATE app_settings SET always_on_top = ?1 WHERE id = 1",
+            params![flag],
+        )
+        .map_err(s)?;
+    } // 释放锁后再调用窗口 API
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_always_on_top(always_on_top).map_err(s)?;
+    }
+    Ok(())
 }
 
 // ============ 解析 / 计划 ============

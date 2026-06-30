@@ -123,3 +123,9 @@ pub struct CarryOverRequest {
     pub week_id: i64,
     pub next_monday_task_ids: Vec<i64>,
 }
+
+/// 应用全局设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    pub always_on_top: bool,
+}

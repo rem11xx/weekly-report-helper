@@ -6,6 +6,10 @@ pub mod models;
 pub mod parser;
 pub mod report;
 
+use tauri::Manager;
+
+use crate::db::DbState;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -14,6 +18,22 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             db::init_db(app.handle())?;
+
+            // 启动时按持久化设置应用窗口置顶（首帧前生效，无闪烁）
+            let state = app.state::<DbState>();
+            let on_top: i64 = {
+                let conn = state.0.lock().unwrap();
+                conn.query_row(
+                    "SELECT always_on_top FROM app_settings WHERE id = 1",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap_or(0)
+            };
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_always_on_top(on_top != 0);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -34,6 +54,8 @@ pub fn run() {
             commands::clear_week_data,
             commands::set_mock_now,
             commands::clear_mock_now,
+            commands::get_always_on_top,
+            commands::set_always_on_top,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

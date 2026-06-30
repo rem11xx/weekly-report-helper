@@ -10,6 +10,7 @@
     "dialog:allow-save",
     "dialog:allow-open",
     "fs:allow-write-text-file",
-    "fs:allow-read-text-file"
+    "fs:allow-read-text-file",
+    "core:window:allow-set-always-on-top"
   ]
 }

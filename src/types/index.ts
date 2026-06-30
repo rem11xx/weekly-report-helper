@@ -111,3 +111,8 @@ export interface CarryOverRequest {
   // 顺延任务仅作为本周周报「下周计划」项呈现（后端从本周任务状态推导），
   // 不再预填进下周 planned_tasks；下周二由新文本解析生成本周任务（P017）。
 }
+
+/** 应用全局设置 */
+export interface AppSettings {
+  always_on_top: boolean;
+}

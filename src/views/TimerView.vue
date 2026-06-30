@@ -8,6 +8,7 @@ import CountdownRing from "@/components/CountdownRing.vue";
 import TaskPickerModal from "@/components/TaskPickerModal.vue";
 import PlanInputModal from "@/components/PlanInputModal.vue";
 import ReportPreviewModal from "@/components/ReportPreviewModal.vue";
+import SettingsModal from "@/components/SettingsModal.vue";
 import {
   NButton,
   NSpace,
@@ -36,6 +37,7 @@ const showDevPanel = isDev && !import.meta.env.VITE_HIDE_DEV_PANEL;
 
 const showPlanModal = ref(false);
 const showReportModal = ref(false);
+const showSettingsModal = ref(false);
 
 const pickerValue = ref<number | null>(
   clock.mockNow ? new Date(clock.mockNow).getTime() : null
@@ -141,6 +143,10 @@ function openPlan() {
 
 function openReport() {
   showReportModal.value = true;
+}
+
+function openSettings() {
+  showSettingsModal.value = true;
 }
 
 /** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作 */
@@ -272,7 +278,7 @@ onMounted(() => {
           <span class="action-icon">📝</span>
           <span class="action-label">生成周报</span>
         </button>
-        <button class="action-btn" disabled title="设置（后续开放）">
+        <button class="action-btn" :class="{ active: showSettingsModal }" @click="openSettings">
           <span class="action-icon">⚙️</span>
           <span class="action-label">设置</span>
         </button>
@@ -298,6 +304,7 @@ onMounted(() => {
     <TaskPickerModal @confirm="() => {}" />
     <PlanInputModal v-model:show="showPlanModal" />
     <ReportPreviewModal v-model:show="showReportModal" />
+    <SettingsModal v-model:show="showSettingsModal" />
   </div>
 </template>
 

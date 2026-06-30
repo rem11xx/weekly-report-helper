@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS pomodoro_sessions (
     is_break    BOOLEAN DEFAULT 0,
     FOREIGN KEY (week_id) REFERENCES weeks(id)
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    -- 单行配置表：CHECK 约束保证仅一行（id 恒为 1）
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    always_on_top INTEGER DEFAULT 0 NOT NULL
+);
 ";
 
 /// 初始化数据库：建表 + 注册到 Tauri 状态
@@ -62,6 +68,12 @@ pub fn init_db(app: &AppHandle) -> Result<()> {
     let db_path = app_data_dir.join("weekly.db");
     let conn = Connection::open(db_path)?;
     conn.execute_batch(SCHEMA)?;
+
+    // 应用全局设置：保证 app_settings 有且仅有一行默认值（旧库/新库幂等）
+    conn.execute(
+        "INSERT OR IGNORE INTO app_settings (id, always_on_top) VALUES (1, 0)",
+        [],
+    )?;
 
     // 幂等迁移：为旧库补列（全新库已由 SCHEMA 建好，这里跳过）
     add_column_if_missing(&conn, "planned_tasks", "done", "INTEGER DEFAULT 0")?;

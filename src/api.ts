@@ -129,3 +129,13 @@ export function clearWeekData(): Promise<void> {
 export function clearMockNow(): Promise<void> {
   return invoke<void>("clear_mock_now");
 }
+
+/** 读取窗口置顶设置 */
+export function getAlwaysOnTop(): Promise<boolean> {
+  return invoke<boolean>("get_always_on_top");
+}
+
+/** 设置窗口置顶（后端写库 + 应用到主窗口） */
+export function setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
+  return invoke<void>("set_always_on_top", { alwaysOnTop });
+}
