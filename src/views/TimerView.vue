@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTimerStore } from "@/stores/timer";
 import { useReportStore } from "@/stores/report";
 import { usePlanStore } from "@/stores/plan";
@@ -26,6 +25,7 @@ import {
   PlayOutline,
   StopOutline,
   RefreshOutline,
+  ExpandOutline,
 } from "@vicons/ionicons5";
 
 const timer = useTimerStore();
@@ -151,48 +151,13 @@ function openSettings() {
   showSettingsModal.value = true;
 }
 
-/** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作（常态专用；浮球态点击展开由下方 pointer 处理） */
+/** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作（常态专用；
+ *  浮球态由 data-tauri-drag-region 拖动 + 中心展开按钮，不走此 @click） */
 function onRingClick() {
+  if (timer.miniMode) return; // 浮球态：drag-region 会吞掉点击，此处兜底防误结束专注
   if (timer.phase === "idle") timer.startFocus();
   else if (timer.phase === "focus") timer.manualEnd();
   else if (timer.phase === "break") timer.reset();
-}
-
-/** 浮球拖动：按下后移动超过阈值 → startDragging 移窗；未移动松手 → 视为点击。
- *  不用 data-tauri-drag-region：它会与点击冲突（startDragging 吞掉 click），
- *  pointer 事件 + 移动阈值能可靠区分「拖动」与「点击」。
- *  常态同样记录移动，拖动过则不触发点击，避免误触结束专注（对齐原 @click 语义）。 */
-const miniDrag = ref<{ x: number; y: number; moved: boolean } | null>(null);
-
-function onRingPointerDown(e: PointerEvent) {
-  miniDrag.value = { x: e.screenX, y: e.screenY, moved: false };
-}
-
-function onRingPointerMove(e: PointerEvent) {
-  const s = miniDrag.value;
-  if (!s || s.moved) return;
-  if (Math.abs(e.screenX - s.x) > 4 || Math.abs(e.screenY - s.y) > 4) {
-    s.moved = true;
-    if (timer.miniMode) {
-      // 浮球态：移动超过阈值 → 拖窗；常态仅标记拖动，不触发点击
-      void getCurrentWindow().startDragging();
-    }
-  }
-}
-
-function onRingPointerUp() {
-  const s = miniDrag.value;
-  miniDrag.value = null;
-  if (s && s.moved) return; // 拖动过 → 不触发点击
-  if (timer.miniMode) {
-    timer.exitMini(); // 点击浮球 → 展开，专注继续
-  } else {
-    onRingClick();
-  }
-}
-
-function onRingPointerCancel() {
-  miniDrag.value = null;
 }
 
 onMounted(() => {
@@ -267,10 +232,8 @@ onMounted(() => {
       <div
         class="ring-wrapper"
         :class="{ mini: timer.miniMode }"
-        @pointerdown="onRingPointerDown"
-        @pointermove="onRingPointerMove"
-        @pointerup="onRingPointerUp"
-        @pointercancel="onRingPointerCancel"
+        :data-tauri-drag-region="timer.miniMode ? 'deep' : null"
+        @click="onRingClick"
       >
         <CountdownRing
           :progress="timer.phase === 'idle' ? 1 : timer.progress"
@@ -278,6 +241,16 @@ onMounted(() => {
           :phase="timer.phase"
           :radius="timer.miniMode ? 20 : 110"
         />
+        <!-- 浮球态中心展开按钮：<button> 是可点击元素，drag-region 不拦截它，
+             点击即恢复主界面（专注继续）；其余区域拖动移窗 -->
+        <button
+          v-if="timer.miniMode"
+          class="mini-expand"
+          title="展开主界面"
+          @click.stop="timer.exitMini()"
+        >
+          <NIcon size="14"><ExpandOutline /></NIcon>
+        </button>
       </div>
 
       <!-- 预设切换 -->
@@ -411,6 +384,7 @@ onMounted(() => {
   background: transparent;
   padding: 0;
   justify-content: center;
+  overflow: hidden;
 }
 
 .timer-view.mini .main-card {
@@ -424,12 +398,14 @@ onMounted(() => {
   justify-content: center;
 }
 
-/* 浮球态：仅圆环描边可见，圆环外全透明（露出桌面）。
-   拖动由 pointer 事件 + startDragging 处理（见脚本），不用 data-tauri-drag-region。 */
+/* 浮球态：圆环容器脱离文档流、铺满窗口并居中——无论窗口实际缩到多大，
+   圆环都恒定居中可见，且不会因常态布局残留产生滚动条。
+   data-tauri-drag-region="deep" 使整个球可拖动（macOS 下由 Tauri 在 mousedown
+   同步触发 start_dragging，可靠移窗）。圆环外全透明露出桌面。 */
 .ring-wrapper.mini {
-  margin-bottom: 0;
-  width: 80px;
-  height: 80px;
+  position: fixed;
+  inset: 0;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -445,15 +421,42 @@ onMounted(() => {
   display: none;
 }
 
-/* SVG 不拦截指针事件，整个 80×80 区域都交给 wrapper 处理拖动/点击；
-   drop-shadow 跟随环形描边，在透明背景下提供层次感 */
+/* drop-shadow 跟随环形描边，在透明背景下提供层次感 */
 .ring-wrapper.mini :deep(.ring-svg) {
-  pointer-events: none;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 
 .ring-wrapper.mini :deep(.countdown-ring) {
   cursor: grab;
+}
+
+/* 浮球中心展开按钮：圆环描边内的小圆按钮，点击恢复主界面（专注继续） */
+.mini-expand {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.mini-expand:hover {
+  background: #ffffff;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.mini-expand:active {
+  transform: translate(-50%, -50%) scale(0.95);
 }
 
 .preset-row {
