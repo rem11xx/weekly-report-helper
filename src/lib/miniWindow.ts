@@ -85,9 +85,15 @@ export async function enterMiniWindow() {
   await w.setDecorations(false);
   await w.setSize(MINI_SIZE);
   await w.setAlwaysOnTop(true);
-  // 回到浮球上次位置（首次进入则留在原地不动）
+  // 回到浮球上次位置（首次进入则留在原地不动）。
+  // 位置恢复为非关键：失败仅记日志不外抛，避免浮球态已缩窗却因移位失败被上层
+  // catch 回 miniMode=false，造成"小窗 + 全界面"的破损态。
   if (miniPos) {
-    await w.setPosition(miniPos);
+    try {
+      await w.setPosition(miniPos);
+    } catch (e) {
+      console.error("恢复浮球位置失败，留在原地", e);
+    }
   }
 }
 
@@ -104,8 +110,12 @@ export async function restoreWindow(alwaysOnTop: boolean) {
     savedSize = null;
   }
   await w.setAlwaysOnTop(alwaysOnTop);
-  // 回到常态上次位置（首次退出若无常态记录则留在原地）
+  // 回到常态上次位置（首次退出若无常态记录则留在原地）。位置恢复非关键，失败仅记日志。
   if (normalPos) {
-    await w.setPosition(normalPos);
+    try {
+      await w.setPosition(normalPos);
+    } catch (e) {
+      console.error("恢复常态窗口位置失败，留在原地", e);
+    }
   }
 }
