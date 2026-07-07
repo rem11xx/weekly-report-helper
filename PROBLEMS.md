@@ -36,7 +36,7 @@
 | P017 | 已关闭 | 高 | 周计划弹窗 / carry_over_tasks | 周二（2026-06-30）打开周计划仍显示上周内容、无本周输入入口 | carry_over 仅标记 `plan_next_monday=1`，不再预填下周 planned_tasks；周报「下周计划」由本周任务状态推导 |
 
 | P018 | 已关闭 | 高 | 周计划弹窗 / Timer 页 / ensure_week_id | 周二下午打开应用无「本周计划未录入」提醒；打开周计划仍显示上周 carry-over 残留任务（表格态），无文本输入入口 | `ensure_week_id` 的 week_end 改用 `week_start+6` 推导（根除幽灵行）；保存/清空计划后联动 `checkReminder()` 刷新 banner |
-| P019 | 已修复 |  | Timer 页 | 专注倒计时中可收起为「浮球」：仅显示半径 200px 倒计时圆环、无标题栏、默认置顶、可拖动；专注结束自动恢复主界面 | 透明窗口需 tauri.conf 声明 `transparent` + `macOSPrivateApi`（Cargo `macos-private-api` feature）；常态保留标题栏，浮球态运行时 `setDecorations(false)` + 强制置顶（不写库，退出按用户偏好恢复） |
+| P019 | 已修复 |  | Timer 页 | 专注倒计时中可收起为「浮球」：仅显示半径 200px 倒计时圆环、无标题栏、默认置顶、可拖动；专注结束自动恢复主界面 | 透明窗口需 tauri.conf 声明 `transparent` + `macOSPrivateApi`（Cargo `macos-private-api` feature），且 macOS 12+ 还须显式 `backgroundColor:[0,0,0,0]` 才能让 WKWebView 的 `underPageBackgroundColor` 透明（仅 `transparent:true` 只关 `drawsBackground`，底色仍不透明）；浮球交互用左键按下 `startDragging` 拖动、双击恢复，不用 `data-tauri-drag-region`（会劫持双击做最大化）；常态保留标题栏，浮球态运行时 `setDecorations(false)` + 强制置顶（不写库，退出按用户偏好恢复） |
 | P020 | 待处理 | 低 | 番茄钟选任务弹窗 / TaskPickerModal | 专注结束选任务弹窗中任务已按项目分组,但每组前未展示项目名;需要在每组选项前显示所属项目 | 分组已存在,缺项目标题头 |
 | P021 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 需要在已有项目的任务列表最下方直接填写计划外任务(项目+标题),而非走单独的新建入口 | 内联新建 adhoc |
 | P022 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 选任务弹窗目前展示上周(历史)创建的计划外任务,应仅展示本周任务,去掉历史 adhoc | 与 `get_task_options` 返回「本周 planned + 历史 adhoc」有关 |
