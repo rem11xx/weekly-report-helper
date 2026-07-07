@@ -15,9 +15,9 @@ import {
  * 置顶不走后端 `set_always_on_top` 命令（那会写库、覆盖用户偏好），
  * 而是直接调前端 window API，仅在浮球期间临时生效，退出时按用户偏好恢复。
  */
-// 半径 20 的圆环 SVG ≈ 68px，窗口取 80×80 留余量给 drop-shadow 与拖动热区。
-const MINI_SIZE = new LogicalSize(80, 80);
-const MINI_MIN = new LogicalSize(80, 80);
+// 半径 50（直径 100）的圆环 SVG ≈ 128px，窗口取 140×140 留余量给 drop-shadow 与拖动热区。
+const MINI_SIZE = new LogicalSize(140, 140);
+const MINI_MIN = new LogicalSize(140, 140);
 // 退出时恢复的最小尺寸，须与 tauri.conf.json 的 minWidth(420)/minHeight(540) 一致。
 const NORMAL_MIN = new LogicalSize(420, 540);
 

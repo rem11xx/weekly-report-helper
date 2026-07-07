@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTimerStore } from "@/stores/timer";
 import { useReportStore } from "@/stores/report";
 import { usePlanStore } from "@/stores/plan";
@@ -25,7 +26,6 @@ import {
   PlayOutline,
   StopOutline,
   RefreshOutline,
-  ExpandOutline,
 } from "@vicons/ionicons5";
 
 const timer = useTimerStore();
@@ -152,12 +152,25 @@ function openSettings() {
 }
 
 /** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作（常态专用；
- *  浮球态由 data-tauri-drag-region 拖动 + 中心展开按钮，不走此 @click） */
+ *  浮球态由 onMiniMouseDown 处理拖动/双击恢复，不走此 @click） */
 function onRingClick() {
-  if (timer.miniMode) return; // 浮球态：drag-region 会吞掉点击，此处兜底防误结束专注
+  if (timer.miniMode) return; // 浮球态兜底，防误结束专注
   if (timer.phase === "idle") timer.startFocus();
   else if (timer.phase === "focus") timer.manualEnd();
   else if (timer.phase === "break") timer.reset();
+}
+
+/** 浮球交互：左键按下即拖动移窗（macOS 需在 mousedown 同步触发 startDragging）；
+ *  双击（detail≥2）恢复主界面、专注继续。
+ *  不用 data-tauri-drag-region：它会把双击劫持为窗口最大化。 */
+function onMiniMouseDown(e: MouseEvent) {
+  if (!timer.miniMode || e.button !== 0) return;
+  e.preventDefault(); // 防文字选中
+  if (e.detail >= 2) {
+    timer.exitMini(); // 双击恢复主界面
+    return;
+  }
+  void getCurrentWindow().startDragging(); // 单击按下即拖动
 }
 
 onMounted(() => {
@@ -232,25 +245,15 @@ onMounted(() => {
       <div
         class="ring-wrapper"
         :class="{ mini: timer.miniMode }"
-        :data-tauri-drag-region="timer.miniMode ? 'deep' : null"
         @click="onRingClick"
+        @mousedown="onMiniMouseDown"
       >
         <CountdownRing
           :progress="timer.phase === 'idle' ? 1 : timer.progress"
           :display="timer.minutesDisplay"
           :phase="timer.phase"
-          :radius="timer.miniMode ? 20 : 110"
+          :radius="timer.miniMode ? 50 : 110"
         />
-        <!-- 浮球态中心展开按钮：<button> 是可点击元素，drag-region 不拦截它，
-             点击即恢复主界面（专注继续）；其余区域拖动移窗 -->
-        <button
-          v-if="timer.miniMode"
-          class="mini-expand"
-          title="展开主界面"
-          @click.stop="timer.exitMini()"
-        >
-          <NIcon size="14"><ExpandOutline /></NIcon>
-        </button>
       </div>
 
       <!-- 预设切换 -->
@@ -416,11 +419,6 @@ onMounted(() => {
   cursor: grabbing;
 }
 
-/* 半径 20 下中心文字不可读，浮球态仅保留圆环 */
-.ring-wrapper.mini :deep(.center-content) {
-  display: none;
-}
-
 /* drop-shadow 跟随环形描边，在透明背景下提供层次感 */
 .ring-wrapper.mini :deep(.ring-svg) {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
@@ -428,35 +426,6 @@ onMounted(() => {
 
 .ring-wrapper.mini :deep(.countdown-ring) {
   cursor: grab;
-}
-
-/* 浮球中心展开按钮：圆环描边内的小圆按钮，点击恢复主界面（专注继续） */
-.mini-expand {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: #3b82f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.mini-expand:hover {
-  background: #ffffff;
-  transform: translate(-50%, -50%) scale(1.08);
-}
-
-.mini-expand:active {
-  transform: translate(-50%, -50%) scale(0.95);
 }
 
 .preset-row {
