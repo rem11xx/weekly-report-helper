@@ -19,7 +19,10 @@ const strokeDashoffset = computed(
   () => circumference.value * (1 - props.progress)
 );
 
-/** 时间字号随半径缩放（radius 110→55px，200→100px），浮球态可读 */
+/** 描边宽度随半径缩放：常态 110→10px；浮球态 20→4px（max 兜底避免过细） */
+const strokeWidth = computed(() => Math.max(4, Math.round(props.radius * 0.09)));
+
+/** 时间字号随半径缩放（radius 110→55px）；浮球态隐藏中心文字，不依赖此值 */
 const timeFontSize = computed(() => `${Math.round(props.radius * 0.5)}px`);
 /** 阶段标签同步缩放，保持视觉比例 */
 const labelFontSize = computed(
@@ -71,7 +74,7 @@ const hint = computed(() => {
         :r="radius"
         fill="none"
         stroke="#e5e7eb"
-        :stroke-width="10"
+        :stroke-width="strokeWidth"
       />
       <!-- 进度圆环 -->
       <circle
@@ -80,7 +83,7 @@ const hint = computed(() => {
         :r="radius"
         fill="none"
         :stroke="phaseColor"
-        :stroke-width="10"
+        :stroke-width="strokeWidth"
         stroke-linecap="round"
         :stroke-dasharray="circumference"
         :stroke-dashoffset="strokeDashoffset"

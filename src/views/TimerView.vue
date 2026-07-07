@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTimerStore } from "@/stores/timer";
 import { useReportStore } from "@/stores/report";
 import { usePlanStore } from "@/stores/plan";
@@ -150,16 +151,48 @@ function openSettings() {
   showSettingsModal.value = true;
 }
 
-/** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作 */
+/** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作（常态专用；浮球态点击展开由下方 pointer 处理） */
 function onRingClick() {
-  if (timer.miniMode) {
-    // 浮球态点圆环 → 展开，不结束专注
-    timer.exitMini();
-    return;
-  }
   if (timer.phase === "idle") timer.startFocus();
   else if (timer.phase === "focus") timer.manualEnd();
   else if (timer.phase === "break") timer.reset();
+}
+
+/** 浮球拖动：按下后移动超过阈值 → startDragging 移窗；未移动松手 → 视为点击。
+ *  不用 data-tauri-drag-region：它会与点击冲突（startDragging 吞掉 click），
+ *  pointer 事件 + 移动阈值能可靠区分「拖动」与「点击」。
+ *  常态同样记录移动，拖动过则不触发点击，避免误触结束专注（对齐原 @click 语义）。 */
+const miniDrag = ref<{ x: number; y: number; moved: boolean } | null>(null);
+
+function onRingPointerDown(e: PointerEvent) {
+  miniDrag.value = { x: e.screenX, y: e.screenY, moved: false };
+}
+
+function onRingPointerMove(e: PointerEvent) {
+  const s = miniDrag.value;
+  if (!s || s.moved) return;
+  if (Math.abs(e.screenX - s.x) > 4 || Math.abs(e.screenY - s.y) > 4) {
+    s.moved = true;
+    if (timer.miniMode) {
+      // 浮球态：移动超过阈值 → 拖窗；常态仅标记拖动，不触发点击
+      void getCurrentWindow().startDragging();
+    }
+  }
+}
+
+function onRingPointerUp() {
+  const s = miniDrag.value;
+  miniDrag.value = null;
+  if (s && s.moved) return; // 拖动过 → 不触发点击
+  if (timer.miniMode) {
+    timer.exitMini(); // 点击浮球 → 展开，专注继续
+  } else {
+    onRingClick();
+  }
+}
+
+function onRingPointerCancel() {
+  miniDrag.value = null;
 }
 
 onMounted(() => {
@@ -234,14 +267,16 @@ onMounted(() => {
       <div
         class="ring-wrapper"
         :class="{ mini: timer.miniMode }"
-        :data-tauri-drag-region="timer.miniMode ? true : null"
-        @click="onRingClick"
+        @pointerdown="onRingPointerDown"
+        @pointermove="onRingPointerMove"
+        @pointerup="onRingPointerUp"
+        @pointercancel="onRingPointerCancel"
       >
         <CountdownRing
           :progress="timer.phase === 'idle' ? 1 : timer.progress"
           :display="timer.minutesDisplay"
           :phase="timer.phase"
-          :radius="timer.miniMode ? 200 : 110"
+          :radius="timer.miniMode ? 20 : 110"
         />
       </div>
 
@@ -389,15 +424,12 @@ onMounted(() => {
   justify-content: center;
 }
 
-/* 圆环容器变为填充圆盘 + 阴影，透明窗口下呈悬浮球；
-   同时作为 drag-region（data-tauri-drag-region）可拖动 */
+/* 浮球态：仅圆环描边可见，圆环外全透明（露出桌面）。
+   拖动由 pointer 事件 + startDragging 处理（见脚本），不用 data-tauri-drag-region。 */
 .ring-wrapper.mini {
   margin-bottom: 0;
-  width: 432px;
-  height: 432px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -406,6 +438,22 @@ onMounted(() => {
 
 .ring-wrapper.mini:active {
   cursor: grabbing;
+}
+
+/* 半径 20 下中心文字不可读，浮球态仅保留圆环 */
+.ring-wrapper.mini :deep(.center-content) {
+  display: none;
+}
+
+/* SVG 不拦截指针事件，整个 80×80 区域都交给 wrapper 处理拖动/点击；
+   drop-shadow 跟随环形描边，在透明背景下提供层次感 */
+.ring-wrapper.mini :deep(.ring-svg) {
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
+
+.ring-wrapper.mini :deep(.countdown-ring) {
+  cursor: grab;
 }
 
 .preset-row {
