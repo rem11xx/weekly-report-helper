@@ -80,18 +80,20 @@ pub fn init_db(app: &AppHandle) -> Result<()> {
     let conn = Connection::open(db_path)?;
     conn.execute_batch(SCHEMA)?;
 
-    // 应用全局设置：保证 app_settings 有且仅有一行默认值（旧库/新库幂等）
-    conn.execute(
-        "INSERT OR IGNORE INTO app_settings (id, always_on_top, focus_enters_mini) VALUES (1, 0, 1)",
-        [],
-    )?;
-
     // 幂等迁移：为旧库补列（全新库已由 SCHEMA 建好，这里跳过）
+    // 必须先于下面的 app_settings 种子 INSERT——INSERT 引用了新列 focus_enters_mini，
+    // 旧库若未先补列会直接报 "no column named focus_enters_mini" 终止 setup。
     add_column_if_missing(&conn, "planned_tasks", "done", "INTEGER DEFAULT 0")?;
     add_column_if_missing(&conn, "adhoc_tasks", "sort_order", "INTEGER DEFAULT 9999")?;
     add_column_if_missing(&conn, "adhoc_tasks", "done", "INTEGER DEFAULT 0")?;
     add_column_if_missing(&conn, "app_settings", "focus_enters_mini", "INTEGER DEFAULT 1 NOT NULL")?;
     add_column_if_missing(&conn, "app_settings", "window_positions", "TEXT")?;
+
+    // 应用全局设置：保证 app_settings 有且仅有一行默认值（旧库/新库幂等）
+    conn.execute(
+        "INSERT OR IGNORE INTO app_settings (id, always_on_top, focus_enters_mini) VALUES (1, 0, 1)",
+        [],
+    )?;
 
     app.manage(DbState(Mutex::new(conn)));
     Ok(())
