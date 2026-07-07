@@ -40,6 +40,7 @@
 | P020 | 待处理 | 低 | 番茄钟选任务弹窗 / TaskPickerModal | 专注结束选任务弹窗中任务已按项目分组,但每组前未展示项目名;需要在每组选项前显示所属项目 | 分组已存在,缺项目标题头 |
 | P021 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 需要在已有项目的任务列表最下方直接填写计划外任务(项目+标题),而非走单独的新建入口 | 内联新建 adhoc |
 | P022 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 选任务弹窗目前展示上周(历史)创建的计划外任务,应仅展示本周任务,去掉历史 adhoc | 与 `get_task_options` 返回「本周 planned + 历史 adhoc」有关 |
+| P023 | 待处理 | 低 | Timer 页 / 浮球 | 浮球功能当前仅 macOS 验证通过，Windows 下需单独调试：①透明窗口背景（`transparent`+`macOSPrivateApi` 为 macOS 调校，Windows 透明机制不同，常态带标题栏的透明窗口可能有渲染瑕疵）；②浮球拖动用 mousedown 触发 `startDragging`（避开 `data-tauri-drag-region` 劫持双击），Windows 行为待验证；③圆环 `drop-shadow` 在 Windows WebView2 下渲染待验证；④跨显示器不同 DPI 下位置恢复准确性 | 实现按 macOS 调校，Windows 透明/拖动机制不同 |
 
 <!-- 示例（保留作格式参考，可删除）：
 | P001 | 待处理 |  | Timer 页 | 倒计时圆环在 0% 时颜色异常 | 仅深色模式复现 |
