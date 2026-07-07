@@ -37,9 +37,9 @@
 
 | P018 | 已关闭 | 高 | 周计划弹窗 / Timer 页 / ensure_week_id | 周二下午打开应用无「本周计划未录入」提醒；打开周计划仍显示上周 carry-over 残留任务（表格态），无文本输入入口 | `ensure_week_id` 的 week_end 改用 `week_start+6` 推导（根除幽灵行）；保存/清空计划后联动 `checkReminder()` 刷新 banner |
 | P019 | 已关闭 |  | Timer 页 | 专注倒计时中可收起为「浮球」：仅显示半径 200px 倒计时圆环、无标题栏、默认置顶、可拖动；专注结束自动恢复主界面 | 透明窗口需 tauri.conf 声明 `transparent` + `macOSPrivateApi`（Cargo `macos-private-api` feature），且 macOS 12+ 还须显式 `backgroundColor:[0,0,0,0]` 才能让 WKWebView 的 `underPageBackgroundColor` 透明（仅 `transparent:true` 只关 `drawsBackground`，底色仍不透明）；浮球交互用左键按下 `startDragging` 拖动、双击恢复，不用 `data-tauri-drag-region`（会劫持双击做最大化）；常态保留标题栏，浮球态运行时 `setDecorations(false)` + 强制置顶（不写库，退出按用户偏好恢复） |
-| P020 | 待处理 | 低 | 番茄钟选任务弹窗 / TaskPickerModal | 专注结束选任务弹窗中任务已按项目分组,但每组前未展示项目名;需要在每组选项前显示所属项目 | 分组已存在,缺项目标题头 |
-| P021 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 需要在已有项目的任务列表最下方直接填写计划外任务(项目+标题),而非走单独的新建入口 | 内联新建 adhoc |
-| P022 | 待处理 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 选任务弹窗目前展示上周(历史)创建的计划外任务,应仅展示本周任务,去掉历史 adhoc | 与 `get_task_options` 返回「本周 planned + 历史 adhoc」有关 |
+| P020 | 已修复 | 低 | 番茄钟选任务弹窗 / TaskPickerModal | 专注结束选任务弹窗中任务已按项目分组,但每组前未展示项目名;需要在每组选项前显示所属项目 | 分组已存在,缺项目标题头 |
+| P021 | 已修复 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 需要在已有项目的任务列表最下方直接填写计划外任务(项目+标题),而非走单独的新建入口 | 每个项目组下空行回车即加 adhoc 到该项目；底部表单用于未列出项目,项目必填、回车提交(无按钮)；计划内/计划外均支持回车与「确认」按钮提交(按最近交互处决定) |
+| P022 | 已修复 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 选任务弹窗目前展示上周(历史)创建的计划外任务,应仅展示本周任务,去掉历史 adhoc | adhoc 查询补 week_id 过滤;历史 adhoc 不再出现于弹窗(预期) |
 | P023 | 待处理 | 低 | Timer 页 / 浮球 | 浮球功能当前仅 macOS 验证通过，Windows 下需单独调试：①透明窗口背景（`transparent`+`macOSPrivateApi` 为 macOS 调校，Windows 透明机制不同，常态带标题栏的透明窗口可能有渲染瑕疵）；②浮球拖动用 mousedown 触发 `startDragging`（避开 `data-tauri-drag-region` 劫持双击），Windows 行为待验证；③圆环 `drop-shadow` 在 Windows WebView2 下渲染待验证；④跨显示器不同 DPI 下位置恢复准确性 | 实现按 macOS 调校，Windows 透明/拖动机制不同 |
 
 <!-- 示例（保留作格式参考，可删除）：

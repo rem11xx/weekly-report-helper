@@ -27,7 +27,7 @@ export function getCurrentWeek(): Promise<CurrentWeek> {
   return invoke<CurrentWeek>("get_current_week");
 }
 
-/** 获取番茄钟选任务弹窗所需的任务列表（本周 planned + 历史 adhoc） */
+/** 获取番茄钟选任务弹窗所需的任务列表（本周 planned + 本周 adhoc） */
 export function getTaskOptions(): Promise<TaskOption[]> {
   return invoke<TaskOption[]>("get_task_options");
 }

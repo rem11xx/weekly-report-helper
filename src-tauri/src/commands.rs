@@ -407,7 +407,10 @@ pub fn get_current_week(state: State<'_, DbState>) -> Result<CurrentWeek, String
 
 // ============ 番茄钟 ============
 
-/// 获取番茄钟选任务弹窗所需的任务列表（本周 planned + 历史 adhoc 去重）
+/// 获取番茄钟选任务弹窗所需的任务列表（本周 planned + 本周 adhoc 去重）
+///
+/// P022：adhoc 仅取本周（`week_id = wid`），不再混入历史周的计划外任务——
+/// 弹窗只服务「本次番茄钟选哪个任务」，历史 adhoc 与本周无关。
 #[tauri::command]
 pub fn get_task_options(state: State<'_, DbState>) -> Result<Vec<TaskOption>, String> {
     let conn = state.0.lock().unwrap();
@@ -441,9 +444,9 @@ pub fn get_task_options(state: State<'_, DbState>) -> Result<Vec<TaskOption>, St
         }
 
         let mut stmt2 = conn
-            .prepare("SELECT id, COALESCE(project,''), title FROM adhoc_tasks WHERE done = 0 ORDER BY created_at DESC")
+            .prepare("SELECT id, COALESCE(project,''), title FROM adhoc_tasks WHERE week_id = ?1 AND done = 0 ORDER BY created_at DESC")
             .map_err(s)?;
-        let rows2 = stmt2.query_map([], |row| {
+        let rows2 = stmt2.query_map(params![wid], |row| {
             Ok(TaskOption {
                 source: "adhoc".into(),
                 task_id: row.get(0)?,
