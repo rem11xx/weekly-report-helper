@@ -92,7 +92,6 @@ The app is organized around a Tuesday-start work week with fixed checkpoints:
 
 ## Known gaps vs. the MVP spec
 These are verified divergences between the spec and the current code — treat as TODOs, not intentional designs:
-- **Report title lacks ISO week number and weekday names** — `render_markdown` (`report.rs:210`) emits `# 工作周报（2024-06-11 ~ 2024-06-17）`; spec wants `# 工作周报（2024-W24 · 06/11 周二 ~ 06/17 周一）`.
 - **Plan-page reminder hint missing** — `needs_plan_reminder` (`commands.rs:446`) drives a Timer-page banner (`TimerView.vue:29`) via `stores/report.ts`, but the spec'd hint on the Plan page is not wired (`PlanInputView.vue` / `stores/plan.ts` don't consume `needsReminder`).
 - **Adhoc task project not enforced** — spec says adhoc creation "必须选/建项目", but `stores/timer.ts:161` passes `""` when blank and `create_adhoc_task` (`commands.rs:277`) accepts it.
 

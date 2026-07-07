@@ -62,10 +62,17 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 /// 初始化数据库：建表 + 注册到 Tauri 状态
 pub fn init_db(app: &AppHandle) -> Result<()> {
+    // 默认 app_data_dir 始终创建：config.json 与（未自定义时的）默认 weekly.db 都住这里
     let app_data_dir = app.path().app_data_dir()?;
     fs::create_dir_all(&app_data_dir)?;
 
-    let db_path = app_data_dir.join("weekly.db");
+    // 解析生效的 DB 路径：自定义目录（来自 config.json）或默认 app_data_dir。
+    // 未配置 / 配置非法时回落默认 —— 与引入本功能前行为一致。
+    let (db_path, _is_custom) = crate::config::effective_db_path(app)?;
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent)?; // 防御：自定义目录理论上已存在（读时校验过）
+    }
+
     let conn = Connection::open(db_path)?;
     conn.execute_batch(SCHEMA)?;
 

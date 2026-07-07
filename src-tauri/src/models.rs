@@ -129,3 +129,10 @@ pub struct CarryOverRequest {
 pub struct AppSettings {
     pub always_on_top: bool,
 }
+
+/// 数据库存储位置信息（供设置页展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DbStorageInfo {
+    pub path: String,
+    pub is_custom: bool,
+}

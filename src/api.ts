@@ -8,6 +8,7 @@ import type {
   Week,
   PomodoroSession,
   AdhocTask,
+  DbStorageInfo,
 } from "@/types";
 
 /** 解析周计划文本（仅预览，不落库） */
@@ -138,4 +139,20 @@ export function getAlwaysOnTop(): Promise<boolean> {
 /** 设置窗口置顶（后端写库 + 应用到主窗口） */
 export function setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
   return invoke<void>("set_always_on_top", { alwaysOnTop });
+}
+
+/** 读取当前数据库存储位置（文件路径 + 是否自定义） */
+export function getDbStoragePath(): Promise<DbStorageInfo> {
+  return invoke<DbStorageInfo>("get_db_storage_path");
+}
+
+/** 切换数据库存储文件夹（后端：校验→按需迁移→写配置→重启）。
+ *  new_dir -> newDir（Tauri v2 把 Rust snake_case 参数名映射为 JS camelCase）。 */
+export function setDbStoragePath(newDir: string): Promise<void> {
+  return invoke<void>("set_db_storage_path", { newDir });
+}
+
+/** 恢复默认存储位置（后端：迁回默认→清空配置→重启） */
+export function restoreDefaultDbPath(): Promise<void> {
+  return invoke<void>("restore_default_db_path");
 }

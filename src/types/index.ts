@@ -116,3 +116,11 @@ export interface CarryOverRequest {
 export interface AppSettings {
   always_on_top: boolean;
 }
+
+/** 数据库存储位置信息（与后端 DbStorageInfo 对应） */
+export interface DbStorageInfo {
+  /** 当前生效的 weekly.db 绝对路径 */
+  path: string;
+  /** false => 默认 app_data_dir 位置；true => 用户自定义目录 */
+  is_custom: boolean;
+}

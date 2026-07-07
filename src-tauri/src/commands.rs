@@ -4,9 +4,11 @@
 //! anyhow::Error 未实现，因此所有命令统一返回 Result<T, String>，
 //! 内部 anyhow 错误通过 map_err 转字符串。
 
-use rusqlite::params;
+use rusqlite::{params, DatabaseName};
+use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager, State};
 
+use crate::config;
 use crate::db::DbState;
 use crate::models::*;
 use crate::parser::{current_week_range, mock_now, parse_plan as parse_plan_text};
@@ -70,6 +72,82 @@ pub fn set_always_on_top(
     if let Some(window) = app.get_webview_window("main") {
         window.set_always_on_top(always_on_top).map_err(s)?;
     }
+    Ok(())
+}
+
+// ============ 数据库存储位置 ============
+
+/// 读取当前数据库文件路径 + 是否自定义位置（供设置页展示）
+#[tauri::command]
+pub fn get_db_storage_path(app: AppHandle) -> Result<DbStorageInfo, String> {
+    let (path, is_custom) = config::effective_db_path(&app).map_err(s)?;
+    Ok(DbStorageInfo {
+        path: path.to_string_lossy().into_owned(),
+        is_custom,
+    })
+}
+
+/// 切换数据库存储文件夹：校验 →（按需）在线备份迁移 → 写 config.json → 触发重启。
+/// 数据策略（用户确认）：目标文件夹已存在 weekly.db 时直接使用该文件（不复制）；
+/// 否则把当前库整库备份迁移到新位置。
+#[tauri::command]
+pub fn set_db_storage_path(
+    state: State<'_, DbState>,
+    app: AppHandle,
+    new_dir: String,
+) -> Result<(), String> {
+    let dir = PathBuf::from(&new_dir);
+    if !dir.is_absolute() {
+        return Err("请选择一个绝对路径的文件夹".into());
+    }
+    if !dir.is_dir() {
+        return Err("文件夹不存在或不是目录".into());
+    }
+    // 可写探测：写一个临时文件再删
+    let probe = dir.join(".weekly_write_probe");
+    fs::write(&probe, b"").map_err(|e| format!("文件夹不可写: {}", e))?;
+    let _ = fs::remove_file(&probe);
+
+    let target_db = dir.join("weekly.db");
+    if !target_db.exists() {
+        // 目标不存在 → 把当前库整库迁移过去（SQLite 在线备份，事务一致快照）
+        let guard = state.0.lock().unwrap();
+        // 当前为 rollback 模式为 no-op；未来启用 WAL 时保证日志已落盘
+        let _ = guard.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+        guard
+            .backup(DatabaseName::Main, &target_db, None)
+            .map_err(s)?;
+        drop(guard);
+    }
+    // 目标已存在 → 直接使用该文件（不复制）
+
+    config::write_db_path_config(&app, Some(&dir)).map_err(s)?;
+    // 用 request_restart（非 restart）：后者 -> ! 会让本命令永不返回，invoke 卡死
+    app.request_restart();
+    Ok(())
+}
+
+/// 恢复默认存储位置：把当前（自定义位置的）库迁回 app_data_dir/weekly.db
+/// （覆盖陈旧默认文件，把数据带回家）→ 清空 db_path → 重启。
+#[tauri::command]
+pub fn restore_default_db_path(
+    state: State<'_, DbState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let (_, is_custom) = config::effective_db_path(&app).map_err(s)?;
+    if !is_custom {
+        return Err("当前已是默认位置".into()); // 同时也是自拷贝护栏
+    }
+    let default_db = config::default_db_path(&app).map_err(s)?;
+    {
+        let guard = state.0.lock().unwrap();
+        let _ = guard.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+        guard
+            .backup(DatabaseName::Main, &default_db, None)
+            .map_err(s)?;
+    }
+    config::write_db_path_config(&app, None).map_err(s)?;
+    app.request_restart();
     Ok(())
 }
 
