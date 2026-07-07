@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { parsePlan, saveWeekPlan, getCurrentWeek, updateTask, createAdhocTask, clearWeekData } from "@/api";
 import type { ParsedPlan, CurrentWeek, AdhocTask } from "@/types";
+import { useReportStore } from "./report";
 
 export const usePlanStore = defineStore("plan", () => {
   /** 原始输入文本 */
@@ -53,6 +54,8 @@ export const usePlanStore = defineStore("plan", () => {
       const week = await saveWeekPlan(rawText.value);
       saveMsg.value = `已保存（${week.week_start} ~ ${week.week_end}）`;
       await loadCurrentWeek();
+      // 计划落库后本周 planned_tasks 已 > 0，刷新提醒状态让 Timer 页 banner 消失（P018）
+      await useReportStore().checkReminder();
     } catch (e) {
       saveMsg.value = "保存失败";
       console.error("保存失败", e);
@@ -100,6 +103,8 @@ export const usePlanStore = defineStore("plan", () => {
     try {
       await clearWeekData();
       await loadCurrentWeek();
+      // 清空后本周回到无计划态，刷新提醒状态让 Timer 页 banner 重新出现（P018）
+      await useReportStore().checkReminder();
     } catch (e) {
       console.error("清空本周数据失败", e);
     }
