@@ -10,8 +10,10 @@ const props = withDefaults(
     /** 当前阶段 */
     phase: "idle" | "focus" | "break";
     radius?: number;
+    /** 浮球态：窗口整体透明，圆环内需半透明底色便于辨识文字 */
+    mini?: boolean;
   }>(),
-  { radius: 110 }
+  { radius: 110, mini: false }
 );
 
 const circumference = computed(() => 2 * Math.PI * props.radius);
@@ -21,6 +23,13 @@ const strokeDashoffset = computed(
 
 /** 描边宽度随半径缩放：常态 110→10px；浮球态 20→4px（max 兜底避免过细） */
 const strokeWidth = computed(() => Math.max(4, Math.round(props.radius * 0.09)));
+
+/** 浮球态圆环内半透明底色：窗口整体透明时给文字一个可辨背景；
+ *  半径略小于描边内缘，避免底色溢出环形描边。常态 none（白卡上无需）。 */
+const discFill = computed(() =>
+  props.mini ? "rgba(255, 255, 255, 0.65)" : "none"
+);
+const discRadius = computed(() => Math.max(1, props.radius - strokeWidth.value / 2));
 
 /** 时间字号随半径缩放（radius 110→55px）；浮球态隐藏中心文字，不依赖此值 */
 const timeFontSize = computed(() => `${Math.round(props.radius * 0.5)}px`);
@@ -67,6 +76,13 @@ const hint = computed(() => {
 <template>
   <div class="countdown-ring" :title="hint">
     <svg :width="radius * 2 + 28" :height="radius * 2 + 28" class="ring-svg">
+      <!-- 浮球态半透明底色圆盘（垫在最底，便于在透明窗口上辨识文字） -->
+      <circle
+        :cx="radius + 14"
+        :cy="radius + 14"
+        :r="discRadius"
+        :fill="discFill"
+      />
       <!-- 背景圆环 -->
       <circle
         :cx="radius + 14"

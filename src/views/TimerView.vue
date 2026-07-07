@@ -253,6 +253,7 @@ onMounted(() => {
           :display="timer.minutesDisplay"
           :phase="timer.phase"
           :radius="timer.miniMode ? 50 : 110"
+          :mini="timer.miniMode"
         />
       </div>
 
