@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { NConfigProvider, NMessageProvider, NDialogProvider, zhCN, dateZhCN } from "naive-ui";
+import { useTimerStore } from "@/stores/timer";
+
+const timer = useTimerStore();
 </script>
 
 <template>
@@ -16,7 +19,7 @@ import { NConfigProvider, NMessageProvider, NDialogProvider, zhCN, dateZhCN } fr
   >
     <NMessageProvider>
       <NDialogProvider>
-        <div class="app-shell">
+        <div class="app-shell" :class="{ mini: timer.miniMode }">
           <RouterView />
         </div>
       </NDialogProvider>
@@ -24,10 +27,24 @@ import { NConfigProvider, NMessageProvider, NDialogProvider, zhCN, dateZhCN } fr
   </NConfigProvider>
 </template>
 
+<style>
+/* 透明窗口（tauri.conf transparent:true）下，html/body 不设背景以保持透明；
+   由 .app-shell 在常态自绘不透明底色，浮球态切透明露出桌面 */
+html,
+body {
+  margin: 0;
+}
+</style>
+
 <style scoped>
 .app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #f5f7fa;
+}
+
+.app-shell.mini {
+  background: transparent;
 }
 </style>

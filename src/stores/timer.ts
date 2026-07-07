@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getTaskOptions, listProjects, createAdhocTask, recordSession } from "@/api";
+import { getTaskOptions, listProjects, createAdhocTask, recordSession, getAlwaysOnTop } from "@/api";
 import { useClockStore } from "@/stores/clock";
+import { enterMiniWindow, restoreWindow } from "@/lib/miniWindow";
 import type { TaskOption } from "@/types";
 
 /** 番茄钟状态 */
@@ -43,6 +44,11 @@ export const useTimerStore = defineStore("timer", () => {
   const showTaskPicker = ref(false);
   // 当前 session 的 started_at（结束时传给后端）
   const focusStartAt = ref("");
+
+  // 浮球模式（专注中收起为仅圆环的小窗）
+  const miniMode = ref(false);
+  // 进入浮球前的窗口置顶偏好，退出时恢复（不写库，仅浮球期间临时置顶）
+  let savedOnTop = false;
 
   // ---- 计算属性 ----
   const progress = computed(() => {
@@ -107,6 +113,7 @@ export const useTimerStore = defineStore("timer", () => {
 
   function reset() {
     stopTick();
+    if (miniMode.value) void exitMini();
     phase.value = "idle";
     remaining.value = 0;
     total.value = 0;
@@ -116,6 +123,30 @@ export const useTimerStore = defineStore("timer", () => {
   function manualEnd() {
     stopTick();
     onTimerEnd();
+  }
+
+  /** 进入浮球模式：仅专注态可用；记下置顶偏好 → 去标题栏 + 缩窗 + 强制置顶 */
+  async function enterMini() {
+    if (phase.value !== "focus") return;
+    try {
+      savedOnTop = await getAlwaysOnTop();
+      miniMode.value = true;
+      await enterMiniWindow();
+    } catch (e) {
+      console.error("进入浮球模式失败", e);
+      miniMode.value = false;
+    }
+  }
+
+  /** 退出浮球模式：恢复标题栏 + 原尺寸 + 用户置顶偏好 */
+  async function exitMini() {
+    if (!miniMode.value) return;
+    try {
+      await restoreWindow(savedOnTop);
+    } catch (e) {
+      console.error("退出浮球模式失败", e);
+    }
+    miniMode.value = false;
   }
 
   /** 【dev】快进到结束前 5 秒：把剩余时间设为 5 秒并保证倒计时在跑，
@@ -139,8 +170,8 @@ export const useTimerStore = defineStore("timer", () => {
   /** 计时结束处理 */
   async function onTimerEnd() {
     if (phase.value === "focus") {
-      // 专注结束 → 弹窗选任务 → 选完后记录 session 并进休息
-      // 实际上我们在选完任务后再记录，这里先弹窗
+      // 专注结束 → 先退出浮球恢复主界面 → 弹窗选任务 → 选完后记录 session 并进休息
+      await exitMini();
       await loadTaskOptions();
       showTaskPicker.value = true;
     } else if (phase.value === "break") {
@@ -239,6 +270,7 @@ export const useTimerStore = defineStore("timer", () => {
     taskOptions,
     projects,
     showTaskPicker,
+    miniMode,
     progress,
     minutesDisplay,
     startFocus,
@@ -247,6 +279,8 @@ export const useTimerStore = defineStore("timer", () => {
     resume,
     reset,
     manualEnd,
+    enterMini,
+    exitMini,
     fastForwardToEnd,
     selectTask,
     loadTaskOptions,

@@ -152,6 +152,11 @@ function openSettings() {
 
 /** 点击倒计时圆环：按当前阶段触发与控制按钮一致的动作 */
 function onRingClick() {
+  if (timer.miniMode) {
+    // 浮球态点圆环 → 展开，不结束专注
+    timer.exitMini();
+    return;
+  }
   if (timer.phase === "idle") timer.startFocus();
   else if (timer.phase === "focus") timer.manualEnd();
   else if (timer.phase === "break") timer.reset();
@@ -165,10 +170,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="timer-view">
+  <div class="timer-view" :class="{ mini: timer.miniMode }">
     <!-- dev 模拟时间面板（仅 dev 构建且未设置 VITE_HIDE_DEV_PANEL 时显示，生产自动隐藏） -->
     <NCard
       v-if="showDevPanel"
+      v-show="!timer.miniMode"
       size="small"
       title="模拟时间（仅 dev）"
       style="margin-bottom: 16px"
@@ -215,6 +221,7 @@ onMounted(() => {
     <!-- 本周未录入计划提醒（周二 12:00 后且本周无 planned_tasks） -->
     <NAlert
       v-if="report.needsReminder"
+      v-show="!timer.miniMode"
       type="warning"
       :bordered="false"
       class="plan-reminder"
@@ -224,16 +231,22 @@ onMounted(() => {
     </NAlert>
 
     <div class="main-card">
-      <div class="ring-wrapper" @click="onRingClick">
+      <div
+        class="ring-wrapper"
+        :class="{ mini: timer.miniMode }"
+        :data-tauri-drag-region="timer.miniMode ? true : null"
+        @click="onRingClick"
+      >
         <CountdownRing
           :progress="timer.phase === 'idle' ? 1 : timer.progress"
           :display="timer.minutesDisplay"
           :phase="timer.phase"
+          :radius="timer.miniMode ? 200 : 110"
         />
       </div>
 
       <!-- 预设切换 -->
-      <div class="preset-row">
+      <div class="preset-row" v-show="!timer.miniMode">
         <NButtonGroup size="small">
           <NButton
             v-for="(p, i) in timer.presets"
@@ -249,7 +262,7 @@ onMounted(() => {
       </div>
 
       <!-- 控制按钮 -->
-      <div class="control-row">
+      <div class="control-row" v-show="!timer.miniMode">
         <template v-if="timer.phase === 'idle'">
           <NButton type="primary" size="large" round @click="timer.startFocus()">
             <template #icon>
@@ -266,6 +279,7 @@ onMounted(() => {
             </template>
             结束
           </NButton>
+          <NButton tertiary round @click="timer.enterMini()">收起为浮球</NButton>
         </template>
 
         <template v-else-if="timer.phase === 'break'">
@@ -281,7 +295,7 @@ onMounted(() => {
       </div>
 
       <!-- 操作按钮 -->
-      <div class="action-buttons">
+      <div class="action-buttons" v-show="!timer.miniMode">
         <button class="action-btn" :class="{ active: showPlanModal }" @click="openPlan">
           <span class="action-icon">📅</span>
           <span class="action-label">周计划</span>
@@ -297,7 +311,7 @@ onMounted(() => {
       </div>
 
       <!-- 底部统计 -->
-      <div class="stats-bar">
+      <div class="stats-bar" v-show="!timer.miniMode">
         <div class="stat-item">
           <span class="stat-label">第 {{ weekInfo.weekNum }} 周, {{ weekInfo.year }}</span>
         </div>
@@ -357,6 +371,43 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+/* ---- 浮球模式：专注中收起为仅圆环的悬浮小球 ---- */
+.timer-view.mini {
+  background: transparent;
+  padding: 0;
+  justify-content: center;
+}
+
+.timer-view.mini .main-card {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+  max-width: none;
+  width: 100%;
+  flex: 1;
+  justify-content: center;
+}
+
+/* 圆环容器变为填充圆盘 + 阴影，透明窗口下呈悬浮球；
+   同时作为 drag-region（data-tauri-drag-region）可拖动 */
+.ring-wrapper.mini {
+  margin-bottom: 0;
+  width: 432px;
+  height: 432px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.ring-wrapper.mini:active {
+  cursor: grabbing;
+}
+
 .preset-row {
   margin-bottom: 20px;
 }
@@ -365,6 +416,7 @@ onMounted(() => {
   min-height: 48px;
   display: flex;
   align-items: center;
+  gap: 12px;
   margin-bottom: 28px;
 }
 

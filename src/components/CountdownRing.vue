@@ -14,9 +14,16 @@ const props = withDefaults(
   { radius: 110 }
 );
 
-const circumference = 2 * Math.PI * props.radius;
+const circumference = computed(() => 2 * Math.PI * props.radius);
 const strokeDashoffset = computed(
-  () => circumference * (1 - props.progress)
+  () => circumference.value * (1 - props.progress)
+);
+
+/** 时间字号随半径缩放（radius 110→55px，200→100px），浮球态可读 */
+const timeFontSize = computed(() => `${Math.round(props.radius * 0.5)}px`);
+/** 阶段标签同步缩放，保持视觉比例 */
+const labelFontSize = computed(
+  () => `${Math.max(16, Math.round(props.radius * 0.1))}px`
 );
 
 const phaseColor = computed(() => {
@@ -82,8 +89,8 @@ const hint = computed(() => {
       />
     </svg>
     <div class="center-content">
-      <div class="time-display" :style="{ color: phaseColor }">{{ display || "25:00" }}</div>
-      <div class="phase-label">{{ phaseLabel }}</div>
+      <div class="time-display" :style="{ color: phaseColor, fontSize: timeFontSize }">{{ display || "25:00" }}</div>
+      <div class="phase-label" :style="{ fontSize: labelFontSize }">{{ phaseLabel }}</div>
     </div>
   </div>
 </template>
