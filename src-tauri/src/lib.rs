@@ -57,6 +57,8 @@ pub fn run() {
             commands::clear_mock_now,
             commands::get_always_on_top,
             commands::set_always_on_top,
+            commands::get_focus_enters_mini,
+            commands::set_focus_enters_mini,
             commands::get_db_storage_path,
             commands::set_db_storage_path,
             commands::restore_default_db_path,

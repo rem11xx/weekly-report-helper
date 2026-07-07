@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getTaskOptions, listProjects, createAdhocTask, recordSession, getAlwaysOnTop } from "@/api";
+import { getTaskOptions, listProjects, createAdhocTask, recordSession, getAlwaysOnTop, getFocusEntersMini } from "@/api";
 import { useClockStore } from "@/stores/clock";
 import { enterMiniWindow, restoreWindow } from "@/lib/miniWindow";
 import type { TaskOption } from "@/types";
@@ -72,6 +72,17 @@ export const useTimerStore = defineStore("timer", () => {
     startedAt.value = clock.nowDate().toISOString();
     focusStartAt.value = startedAt.value;
     startTick();
+    // 按设置决定是否开始即进入浮球（默认开）
+    void maybeEnterMini();
+  }
+
+  /** 读取「开始专注即进入浮球」设置，开启则收起为浮球 */
+  async function maybeEnterMini() {
+    try {
+      if (await getFocusEntersMini()) await enterMini();
+    } catch (e) {
+      console.error("读取专注浮球设置失败", e);
+    }
   }
 
   function startBreak() {

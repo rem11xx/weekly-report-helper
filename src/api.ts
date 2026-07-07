@@ -141,6 +141,16 @@ export function setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
   return invoke<void>("set_always_on_top", { alwaysOnTop });
 }
 
+/** 读取「开始专注即进入浮球」设置（默认开） */
+export function getFocusEntersMini(): Promise<boolean> {
+  return invoke<boolean>("get_focus_enters_mini");
+}
+
+/** 设置「开始专注即进入浮球」（仅写库；专注开始时由前端读取生效） */
+export function setFocusEntersMini(focusEntersMini: boolean): Promise<void> {
+  return invoke<void>("set_focus_enters_mini", { focusEntersMini });
+}
+
 /** 读取当前数据库存储位置（文件路径 + 是否自定义） */
 export function getDbStoragePath(): Promise<DbStorageInfo> {
   return invoke<DbStorageInfo>("get_db_storage_path");

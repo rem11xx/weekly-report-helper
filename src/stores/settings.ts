@@ -3,6 +3,8 @@ import { ref } from "vue";
 import {
   getAlwaysOnTop,
   setAlwaysOnTop,
+  getFocusEntersMini,
+  setFocusEntersMini,
   getDbStoragePath,
   setDbStoragePath,
   restoreDefaultDbPath,
@@ -12,6 +14,8 @@ import type { DbStorageInfo } from "@/types";
 export const useSettingsStore = defineStore("settings", () => {
   /** 窗口置顶 */
   const alwaysOnTop = ref(false);
+  /** 开始专注即进入浮球（默认开） */
+  const focusEntersMini = ref(true);
   /** 切换中（开关 loading） */
   const loading = ref(false);
 
@@ -26,6 +30,11 @@ export const useSettingsStore = defineStore("settings", () => {
       alwaysOnTop.value = await getAlwaysOnTop();
     } catch (e) {
       console.error("读取置顶设置失败", e);
+    }
+    try {
+      focusEntersMini.value = await getFocusEntersMini();
+    } catch (e) {
+      console.error("读取专注浮球设置失败", e);
     }
     try {
       dbInfo.value = await getDbStoragePath();
@@ -43,6 +52,21 @@ export const useSettingsStore = defineStore("settings", () => {
       await setAlwaysOnTop(v);
     } catch (e) {
       alwaysOnTop.value = prev;
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /** 切换「开始专注即进入浮球」：乐观更新，失败回滚 */
+  async function updateFocusEntersMini(v: boolean) {
+    const prev = focusEntersMini.value;
+    focusEntersMini.value = v;
+    loading.value = true;
+    try {
+      await setFocusEntersMini(v);
+    } catch (e) {
+      focusEntersMini.value = prev;
       throw e;
     } finally {
       loading.value = false;
@@ -75,11 +99,13 @@ export const useSettingsStore = defineStore("settings", () => {
 
   return {
     alwaysOnTop,
+    focusEntersMini,
     loading,
     dbInfo,
     dbBusy,
     load,
     updateAlwaysOnTop,
+    updateFocusEntersMini,
     setDbPath,
     restoreDb,
   };

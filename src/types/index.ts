@@ -115,6 +115,8 @@ export interface CarryOverRequest {
 /** 应用全局设置 */
 export interface AppSettings {
   always_on_top: boolean;
+  /** 开始专注即进入浮球（默认开） */
+  focus_enters_mini: boolean;
 }
 
 /** 数据库存储位置信息（与后端 DbStorageInfo 对应） */

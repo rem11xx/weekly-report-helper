@@ -128,6 +128,8 @@ pub struct CarryOverRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub always_on_top: bool,
+    /// 开始专注即进入浮球（默认开）
+    pub focus_enters_mini: bool,
 }
 
 /// 数据库存储位置信息（供设置页展示）

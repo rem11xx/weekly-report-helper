@@ -84,6 +84,36 @@ pub fn set_always_on_top(
     Ok(())
 }
 
+/// 读取「开始专注即进入浮球」设置（默认开）
+#[tauri::command]
+pub fn get_focus_enters_mini(state: State<'_, DbState>) -> Result<bool, String> {
+    let conn = state.0.lock().unwrap();
+    let flag: i64 = conn
+        .query_row(
+            "SELECT focus_enters_mini FROM app_settings WHERE id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(1);
+    Ok(flag != 0)
+}
+
+/// 设置「开始专注即进入浮球」（仅写库；专注开始时由前端读取生效）
+#[tauri::command]
+pub fn set_focus_enters_mini(
+    state: State<'_, DbState>,
+    focus_enters_mini: bool,
+) -> Result<(), String> {
+    let flag: i64 = if focus_enters_mini { 1 } else { 0 };
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "UPDATE app_settings SET focus_enters_mini = ?1 WHERE id = 1",
+        params![flag],
+    )
+    .map_err(s)?;
+    Ok(())
+}
+
 // ============ 数据库存储位置 ============
 
 /// 读取当前数据库文件路径 + 是否自定义位置（供设置页展示）

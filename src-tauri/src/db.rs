@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS pomodoro_sessions (
 CREATE TABLE IF NOT EXISTS app_settings (
     -- 单行配置表：CHECK 约束保证仅一行（id 恒为 1）
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    always_on_top INTEGER DEFAULT 0 NOT NULL
+    always_on_top INTEGER DEFAULT 0 NOT NULL,
+    -- 开始专注即进入浮球（默认开）
+    focus_enters_mini INTEGER DEFAULT 1 NOT NULL
 );
 ";
 
@@ -78,7 +80,7 @@ pub fn init_db(app: &AppHandle) -> Result<()> {
 
     // 应用全局设置：保证 app_settings 有且仅有一行默认值（旧库/新库幂等）
     conn.execute(
-        "INSERT OR IGNORE INTO app_settings (id, always_on_top) VALUES (1, 0)",
+        "INSERT OR IGNORE INTO app_settings (id, always_on_top, focus_enters_mini) VALUES (1, 0, 1)",
         [],
     )?;
 
@@ -86,6 +88,7 @@ pub fn init_db(app: &AppHandle) -> Result<()> {
     add_column_if_missing(&conn, "planned_tasks", "done", "INTEGER DEFAULT 0")?;
     add_column_if_missing(&conn, "adhoc_tasks", "sort_order", "INTEGER DEFAULT 9999")?;
     add_column_if_missing(&conn, "adhoc_tasks", "done", "INTEGER DEFAULT 0")?;
+    add_column_if_missing(&conn, "app_settings", "focus_enters_mini", "INTEGER DEFAULT 1 NOT NULL")?;
 
     app.manage(DbState(Mutex::new(conn)));
     Ok(())

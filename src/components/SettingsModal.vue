@@ -35,6 +35,14 @@ async function onToggle(v: boolean) {
   }
 }
 
+async function onToggleMini(v: boolean) {
+  try {
+    await store.updateFocusEntersMini(v);
+  } catch {
+    message.error("设置失败，请重试");
+  }
+}
+
 // 选择文件夹 → 二次确认 → 后端迁移+重启。
 // 重启会杀进程，invoke 的 promise 不一定 resolve，故先弹持久 loading toast。
 async function onPickFolder() {
@@ -100,6 +108,18 @@ function close() {
         <div class="desc">开启后窗口始终显示在最上层</div>
       </div>
       <NSwitch :value="store.alwaysOnTop" :loading="store.loading" @update:value="onToggle" />
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-label">
+        <div class="title">开始专注进入浮球</div>
+        <div class="desc">开启后点击「开始」即收起为浮球，仅显示倒计时圆环；关闭则停留在主界面</div>
+      </div>
+      <NSwitch
+        :value="store.focusEntersMini"
+        :loading="store.loading"
+        @update:value="onToggleMini"
+      />
     </div>
 
     <div class="settings-row db-row">
