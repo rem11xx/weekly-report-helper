@@ -19,9 +19,18 @@ fn s<E: std::fmt::Display>(err: E) -> String {
     err.to_string()
 }
 
-/// 获取或自动创建当前周 ID（消除 or_else 泛型推断问题）
+/// 获取或自动创建指定周 ID（消除 or_else 泛型推断问题）
+///
+/// week_end 由传入的 week_start 推导（+6 天），**不**重新调 `current_week_range()`：
+/// 调用方可能传入非当前周的 week_start（如未来某周），若 week_end 取当前周会得到
+/// `week_end < week_start` 的幽灵行——P018 根因即此（id=3 出现 07-07~07-06）。
 fn ensure_week_id(conn: &rusqlite::Connection, week_start: &str) -> Result<i64, String> {
-    let (_, week_end) = current_week_range();
+    use chrono::NaiveDate;
+    let start_date = NaiveDate::parse_from_str(week_start, "%Y-%m-%d").map_err(s)?;
+    let week_end = (start_date + chrono::Duration::days(6))
+        .format("%Y-%m-%d")
+        .to_string();
+
     conn.query_row(
         "SELECT id FROM weeks WHERE week_start = ?1",
         params![week_start],

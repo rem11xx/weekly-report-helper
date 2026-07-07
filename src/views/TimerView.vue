@@ -16,6 +16,7 @@ import {
   NTag,
   NDatePicker,
   NCard,
+  NAlert,
   NIcon,
   useDialog,
   useMessage,
@@ -211,6 +212,17 @@ onMounted(() => {
       </NSpace>
     </NCard>
 
+    <!-- 本周未录入计划提醒（周二 12:00 后且本周无 planned_tasks） -->
+    <NAlert
+      v-if="report.needsReminder"
+      type="warning"
+      :bordered="false"
+      class="plan-reminder"
+      @click="openPlan"
+    >
+      📅 本周尚未录入计划，点击填写
+    </NAlert>
+
     <div class="main-card">
       <div class="ring-wrapper" @click="onRingClick">
         <CountdownRing
@@ -319,6 +331,13 @@ onMounted(() => {
   padding: 20px;
   overflow-y: auto;
   background: #f5f7fa;
+}
+
+.plan-reminder {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 16px;
+  cursor: pointer;
 }
 
 .main-card {
