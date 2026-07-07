@@ -5,7 +5,9 @@
   font-weight: 400;
   color-scheme: light;
   color: #1f2937;
-  background-color: #f5f7fa;
+  /* 透明窗口：:root 背景会传播到整个视口画布，必须透明，
+     否则会盖住 WKWebView 的透明背景。常态底色由 .app-shell 自绘。 */
+  background-color: transparent;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
