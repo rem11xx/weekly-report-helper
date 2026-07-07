@@ -126,3 +126,15 @@ export interface DbStorageInfo {
   /** false => 默认 app_data_dir 位置；true => 用户自定义目录 */
   is_custom: boolean;
 }
+
+/** 窗口位置（逻辑坐标，跨屏 DPI 无关；与后端 WindowPosition 对应） */
+export interface WindowPosition {
+  x: number;
+  y: number;
+}
+
+/** 浮球/常态各自记忆的窗口位置（与后端 WindowPositions 对应） */
+export interface WindowPositions {
+  normal: WindowPosition | null;
+  mini: WindowPosition | null;
+}

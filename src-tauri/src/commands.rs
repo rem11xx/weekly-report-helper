@@ -114,6 +114,40 @@ pub fn set_focus_enters_mini(
     Ok(())
 }
 
+/// 读取浮球/常态各自记忆的窗口位置（JSON 列；空/损坏回落空）
+#[tauri::command]
+pub fn get_window_positions(state: State<'_, DbState>) -> Result<WindowPositions, String> {
+    let conn = state.0.lock().unwrap();
+    let json: Option<String> = conn
+        .query_row(
+            "SELECT window_positions FROM app_settings WHERE id = 1",
+            [],
+            |r| r.get::<_, Option<String>>(0),
+        )
+        .unwrap_or(None);
+    let positions = match json {
+        Some(s) if !s.trim().is_empty() => serde_json::from_str(&s).unwrap_or_default(),
+        _ => WindowPositions::default(),
+    };
+    Ok(positions)
+}
+
+/// 写入浮球/常态窗口位置（整体覆盖；前端在捕获位置时调用）
+#[tauri::command]
+pub fn set_window_positions(
+    state: State<'_, DbState>,
+    positions: WindowPositions,
+) -> Result<(), String> {
+    let json = serde_json::to_string(&positions).map_err(s)?;
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "UPDATE app_settings SET window_positions = ?1 WHERE id = 1",
+        params![json],
+    )
+    .map_err(s)?;
+    Ok(())
+}
+
 // ============ 数据库存储位置 ============
 
 /// 读取当前数据库文件路径 + 是否自定义位置（供设置页展示）

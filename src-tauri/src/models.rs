@@ -138,3 +138,21 @@ pub struct DbStorageInfo {
     pub path: String,
     pub is_custom: bool,
 }
+
+/// 窗口位置（逻辑坐标，跨屏 DPI 无关）
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct WindowPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// 浮球/常态各自记忆的窗口位置，持久化到 app_settings.window_positions。
+/// normal 由后端 setup 钩子启动时恢复（常态窗口回到上次位置）；
+/// mini 由前端进入浮球时读取、退出浮球时写回（浮球回到上次位置）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WindowPositions {
+    #[serde(default)]
+    pub normal: Option<WindowPosition>,
+    #[serde(default)]
+    pub mini: Option<WindowPosition>,
+}

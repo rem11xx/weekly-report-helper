@@ -9,6 +9,7 @@ import type {
   PomodoroSession,
   AdhocTask,
   DbStorageInfo,
+  WindowPositions,
 } from "@/types";
 
 /** 解析周计划文本（仅预览，不落库） */
@@ -149,6 +150,16 @@ export function getFocusEntersMini(): Promise<boolean> {
 /** 设置「开始专注即进入浮球」（仅写库；专注开始时由前端读取生效） */
 export function setFocusEntersMini(focusEntersMini: boolean): Promise<void> {
   return invoke<void>("set_focus_enters_mini", { focusEntersMini });
+}
+
+/** 读取浮球/常态各自记忆的窗口位置（逻辑坐标） */
+export function getWindowPositions(): Promise<WindowPositions> {
+  return invoke<WindowPositions>("get_window_positions");
+}
+
+/** 写入浮球/常态窗口位置（整体覆盖；前端在切换捕获位置时调用） */
+export function setWindowPositions(positions: WindowPositions): Promise<void> {
+  return invoke<void>("set_window_positions", { positions });
 }
 
 /** 读取当前数据库存储位置（文件路径 + 是否自定义） */

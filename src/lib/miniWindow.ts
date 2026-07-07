@@ -3,6 +3,7 @@ import {
   LogicalSize,
   LogicalPosition,
 } from "@tauri-apps/api/window";
+import { getWindowPositions, setWindowPositions } from "@/api";
 
 /**
  * 专注浮球模式的窗口操作封装（单窗口方案，不开新窗口）。
@@ -15,9 +16,12 @@ import {
  * 透明窗口（tauri.conf `transparent:true` + `macOSPrivateApi`）下，去标题栏后
  * 内容区透明，仅圆环描边可见，呈悬浮球；CSS drop-shadow 给描边加层次。
  *
- * 位置记忆：常态/浮球各自记住上次的外框位置（逻辑坐标），切换时回到该态上次位置，
- * 而非在原地变形。位置在同一 decorations 态下捕获与恢复——常态位置在带标题栏时
- * 捕获/恢复，浮球位置在无标题栏时捕获/恢复——避免标题栏高度造成偏移。
+ * 位置记忆（跨重启持久化到 app_settings.window_positions）：
+ * 常态/浮球各自记住上次的外框位置（逻辑坐标），切换时回到该态上次位置而非在原地变形。
+ * 位置在同一 decorations 态下捕获与恢复——常态位置在带标题栏时捕获/恢复，
+ * 浮球位置在无标题栏时捕获/恢复——避免标题栏高度造成偏移。
+ * 常态位置由后端 setup 钩子启动时恢复（首帧前，无闪烁，带显示器内校验）；
+ * 浮球位置由前端 initWindowPositions 启动加载、进入浮球时使用、退出浮球时写回。
  *
  * 置顶不走后端 `set_always_on_top` 命令（那会写库、覆盖用户偏好），
  * 而是直接调前端 window API，仅在浮球期间临时生效，退出时按用户偏好恢复。
@@ -41,6 +45,29 @@ async function currentLogicalPos(): Promise<LogicalPosition> {
   return new LogicalPosition(physical.x / factor, physical.y / factor);
 }
 
+/** 把当前两态位置整体写回后端（捕获位置后调用，失败仅记日志不阻断） */
+async function persistPositions() {
+  try {
+    await setWindowPositions({
+      normal: normalPos ? { x: normalPos.x, y: normalPos.y } : null,
+      mini: miniPos ? { x: miniPos.x, y: miniPos.y } : null,
+    });
+  } catch (e) {
+    console.error("持久化窗口位置失败", e);
+  }
+}
+
+/** 启动时加载上次窗口位置：常态位置已由后端 setup 钩子恢复，此处取浮球位置备用 */
+export async function initWindowPositions() {
+  try {
+    const p = await getWindowPositions();
+    if (p.normal) normalPos = new LogicalPosition(p.normal.x, p.normal.y);
+    if (p.mini) miniPos = new LogicalPosition(p.mini.x, p.mini.y);
+  } catch (e) {
+    console.error("读取窗口位置失败", e);
+  }
+}
+
 /** 进入浮球态：放宽最小尺寸 + 去标题栏 + 缩窗 + 强制置顶 + 回到浮球上次位置 */
 export async function enterMiniWindow() {
   const w = getCurrentWindow();
@@ -52,6 +79,7 @@ export async function enterMiniWindow() {
   }
   // 常态位置：此时仍带标题栏，与退出时恢复态一致
   normalPos = await currentLogicalPos();
+  void persistPositions(); // 持久化常态位置，供下次启动恢复
   // 先放宽最小尺寸，否则 setSize(80,80) 会被 tauri.conf 的 minHeight 540 钳制
   await w.setMinSize(MINI_MIN);
   await w.setDecorations(false);
@@ -68,6 +96,7 @@ export async function restoreWindow(alwaysOnTop: boolean) {
   const w = getCurrentWindow();
   // 浮球位置：此时已无标题栏，与进入时恢复态一致
   miniPos = await currentLogicalPos();
+  void persistPositions(); // 持久化浮球位置，供下次进入浮球恢复
   await w.setDecorations(true);
   await w.setMinSize(NORMAL_MIN);
   if (savedSize) {

@@ -58,7 +58,9 @@ CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     always_on_top INTEGER DEFAULT 0 NOT NULL,
     -- 开始专注即进入浮球（默认开）
-    focus_enters_mini INTEGER DEFAULT 1 NOT NULL
+    focus_enters_mini INTEGER DEFAULT 1 NOT NULL,
+    -- 浮球/常态各自记忆的窗口位置（逻辑坐标 JSON，含 normal/mini 两个 [x,y]）
+    window_positions TEXT
 );
 ";
 
@@ -89,6 +91,7 @@ pub fn init_db(app: &AppHandle) -> Result<()> {
     add_column_if_missing(&conn, "adhoc_tasks", "sort_order", "INTEGER DEFAULT 9999")?;
     add_column_if_missing(&conn, "adhoc_tasks", "done", "INTEGER DEFAULT 0")?;
     add_column_if_missing(&conn, "app_settings", "focus_enters_mini", "INTEGER DEFAULT 1 NOT NULL")?;
+    add_column_if_missing(&conn, "app_settings", "window_positions", "TEXT")?;
 
     app.manage(DbState(Mutex::new(conn)));
     Ok(())

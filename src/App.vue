@@ -1,8 +1,15 @@
 <script setup lang="ts">
+import { onMounted } from "vue";
 import { NConfigProvider, NMessageProvider, NDialogProvider, zhCN, dateZhCN } from "naive-ui";
 import { useTimerStore } from "@/stores/timer";
+import { initWindowPositions } from "@/lib/miniWindow";
 
 const timer = useTimerStore();
+
+// 启动时加载上次窗口位置：常态位置已由后端恢复，此处取浮球位置供首次进入浮球使用
+onMounted(() => {
+  void initWindowPositions();
+});
 </script>
 
 <template>
