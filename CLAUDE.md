@@ -15,7 +15,8 @@ User-reported problems are **recorded, not fixed immediately**. The user decides
 - Problem list lives at `PROBLEMS.md` (repo root) — plain Markdown so other tools can read it.
 - When the user reports a problem, append a new row to the **问题清单** table in `PROBLEMS.md`: next `P###` id, 状态 `待处理`, 模块/页面, 问题描述, today's date. Leave 优先级 blank for the user to fill.
 - Do **not** start modifying code for a recorded problem unless the user explicitly asks (e.g. "修 P002"/"开始处理…"). If unsure whether something is blocking/urgent, ask before recording vs. fixing.
-- When fixed and self-checked (build/type-check passing), set 状态 `已修复` (note what was done in 备注); when the user confirms it in the running app, set `已关闭` and delete that problem's records (table row + its 方案 section) from `PROBLEMS.md`.
+- When fixed and self-checked (build/type-check passing), set 状态 `已修复`; when the user confirms it in the running app, set `已关闭` and delete that problem's 方案 section from `PROBLEMS.md` (keep the table row for history).
+- 备注 column: keep it short — only note things to watch out for afterward (design trade-offs, constraints, deliberate non-fixes, unrecoverable data, cross-refs like 「随 P009 一并修复」). Don't record the full step-by-step (root-cause chains, `file:line` refs, commit hashes, `cargo test`/`pnpm build` passing, user-verification phrases) — those live in git and the code. For trivial fixes (style/copy tweaks, dead-code removal), leave 备注 empty.
 - Status values: 待处理 / 已修复 / 已关闭. Priority values (高 / 中 / 低) — user-assigned, or assessed by Claude by impact when the user hasn't assigned them.
 
 ### Branch workflow for fixes
