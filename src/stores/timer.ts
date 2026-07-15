@@ -64,11 +64,18 @@ export const useTimerStore = defineStore("timer", () => {
 
   // ---- 倒计时 ----
   let timerHandle: ReturnType<typeof setInterval> | null = null;
+  // 当前倒计时的墙钟起点（real epoch ms）。用墙钟差值而非 setInterval 累计计数，
+  // 避免窗口后台/失焦时 WebView 节流 setInterval 导致倒计时停滞（P024）。
+  let countdownStartMs = 0;
+  // 暂停时刻；resume 时把暂停时长补回 countdownStartMs，使暂停不计入倒计时。
+  let pausedAtMs: number | null = null;
 
   function startFocus() {
     phase.value = "focus";
     total.value = preset.value.focusMin * 60;
     remaining.value = total.value;
+    countdownStartMs = Date.now();
+    pausedAtMs = null;
     startedAt.value = clock.nowDate().toISOString();
     focusStartAt.value = startedAt.value;
     startTick();
@@ -89,20 +96,35 @@ export const useTimerStore = defineStore("timer", () => {
     phase.value = "break";
     total.value = preset.value.breakMin * 60;
     remaining.value = total.value;
+    countdownStartMs = Date.now();
+    pausedAtMs = null;
     startedAt.value = clock.nowDate().toISOString();
     startTick();
   }
 
+  /** 按墙钟同步剩余时间：remaining = total - 自起点经过的秒数。
+   *  无论 setInterval 是否被后台节流，每次 tick 都用真实经过时间重算，故节流只会让
+   *  UI 刷新变慢、不会让倒计时变慢；窗口回到前台再由 recalibrate 立即补校准（见 P024）。
+   *  timerHandle === null 的守卫确保倒计时已结束/已暂停时不重复触发 onTimerEnd。 */
+  function syncRemaining() {
+    if (phase.value === "idle" || timerHandle === null) return;
+    const elapsed = Math.floor((Date.now() - countdownStartMs) / 1000);
+    remaining.value = Math.max(0, total.value - elapsed);
+    if (remaining.value <= 0) {
+      remaining.value = 0;
+      stopTick();
+      void onTimerEnd();
+    }
+  }
+
   function startTick() {
     stopTick();
-    timerHandle = setInterval(() => {
-      remaining.value--;
-      if (remaining.value <= 0) {
-        remaining.value = 0;
-        stopTick();
-        onTimerEnd();
-      }
-    }, 1000);
+    timerHandle = setInterval(syncRemaining, 1000);
+  }
+
+  /** 窗口重获焦点/可见时立即按墙钟校准倒计时，修正后台节流期间的停滞（P024） */
+  function recalibrate() {
+    syncRemaining();
   }
 
   function stopTick() {
@@ -113,17 +135,24 @@ export const useTimerStore = defineStore("timer", () => {
   }
 
   function pause() {
+    if (timerHandle === null) return; // 未在计时则无需暂停
     stopTick();
+    pausedAtMs = Date.now();
   }
 
   function resume() {
-    if (phase.value !== "idle") {
-      startTick();
+    if (phase.value === "idle") return;
+    if (pausedAtMs !== null) {
+      // 暂停期间不计入倒计时：把起点后移暂停时长
+      countdownStartMs += Date.now() - pausedAtMs;
+      pausedAtMs = null;
     }
+    startTick();
   }
 
   function reset() {
     stopTick();
+    pausedAtMs = null;
     if (miniMode.value) void exitMini();
     phase.value = "idle";
     remaining.value = 0;
@@ -133,6 +162,7 @@ export const useTimerStore = defineStore("timer", () => {
   /** 手动结束专注：走与自然结束相同的「弹窗选任务 → 记录 session → 进休息」流程 */
   function manualEnd() {
     stopTick();
+    pausedAtMs = null;
     onTimerEnd();
   }
 
@@ -174,6 +204,9 @@ export const useTimerStore = defineStore("timer", () => {
       start.setSeconds(start.getSeconds() - (total.value - 5));
       focusStartAt.value = start.toISOString();
     }
+    // 墙钟起点前移到 (total-5) 秒前，使 syncRemaining 重算得到 remaining=5
+    countdownStartMs = Date.now() - (total.value - 5) * 1000;
+    pausedAtMs = null;
     remaining.value = 5;
     startTick(); // 即便之前是暂停状态，也保证 5 秒后能触发自然结束
   }
@@ -267,6 +300,17 @@ export const useTimerStore = defineStore("timer", () => {
     } catch (e) {
       console.error("记录 session 失败", e);
     }
+  }
+
+  // 窗口回到前台/重获焦点时立即按墙钟校准倒计时，修正后台 setInterval 节流导致的停滞（P024）。
+  // 监听在 store 首次实例化时注册一次，随应用生命周期存在，无需清理。
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") recalibrate();
+    });
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("focus", recalibrate);
   }
 
   return {

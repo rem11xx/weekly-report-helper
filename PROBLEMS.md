@@ -41,6 +41,7 @@
 | P021 | 已关闭 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 需要在已有项目的任务列表最下方直接填写计划外任务(项目+标题),而非走单独的新建入口 | 每个项目组下空行回车即加 adhoc 到该项目；底部表单用于未列出项目,项目必填、回车提交(无按钮)；计划内/计划外均支持回车与「确认」按钮提交(按最近交互处决定) |
 | P022 | 已关闭 | 中 | 番茄钟选任务弹窗 / TaskPickerModal | 选任务弹窗目前展示上周(历史)创建的计划外任务,应仅展示本周任务,去掉历史 adhoc | adhoc 查询补 week_id 过滤;历史 adhoc 不再出现于弹窗(预期) |
 | P023 | 待处理 | 低 | Timer 页 / 浮球 | 浮球功能当前仅 macOS 验证通过，Windows 下需单独调试：①透明窗口背景（`transparent`+`macOSPrivateApi` 为 macOS 调校，Windows 透明机制不同，常态带标题栏的透明窗口可能有渲染瑕疵）；②浮球拖动用 mousedown 触发 `startDragging`（避开 `data-tauri-drag-region` 劫持双击），Windows 行为待验证；③圆环 `drop-shadow` 在 Windows WebView2 下渲染待验证；④跨显示器不同 DPI 下位置恢复准确性 | 实现按 macOS 调校，Windows 透明/拖动机制不同 |
+| P024 | 已修复 |  | Timer 页 / 休息倒计时 | 主界面不在最上层（失焦/被遮挡/最小化）时休息倒计时不按实际墙钟时间走：倒计时靠 `setInterval` 每秒 `remaining--`，后台窗口 interval 被 WebView 节流、tick 次数远少于实际秒数，实际已远超 breakMin（如已过半小时）回到主界面时倒计时仍未走完、休息结束未触发 | 同一根因也影响专注倒计时，但专注有浮球常驻置顶不易察觉；修复已覆盖两阶段 |
 
 <!-- 示例（保留作格式参考，可删除）：
 | P001 | 待处理 |  | Timer 页 | 倒计时圆环在 0% 时颜色异常 | 仅深色模式复现 |
