@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getTaskOptions, listProjects, createAdhocTask, recordSession, getAlwaysOnTop, getFocusEntersMini } from "@/api";
 import { useClockStore } from "@/stores/clock";
-import { enterMiniWindow, restoreWindow } from "@/lib/miniWindow";
+import { enterMiniWindow, restoreWindow, bringToFrontOnce } from "@/lib/miniWindow";
 import type { TaskOption } from "@/types";
 
 /** 番茄钟状态 */
@@ -181,8 +181,9 @@ export const useTimerStore = defineStore("timer", () => {
   /** 计时结束处理 */
   async function onTimerEnd() {
     if (phase.value === "focus") {
-      // 专注结束 → 先退出浮球恢复主界面 → 弹窗选任务 → 选完后记录 session 并进休息
+      // 专注结束 → 先退出浮球恢复主界面，置顶一次提醒填任务 → 弹窗选任务 → 选完后记录 session 并进休息
       await exitMini();
+      await bringToFrontOnce();
       await loadTaskOptions();
       showTaskPicker.value = true;
     } else if (phase.value === "break") {

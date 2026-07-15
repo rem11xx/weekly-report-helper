@@ -3,7 +3,7 @@ import {
   LogicalSize,
   LogicalPosition,
 } from "@tauri-apps/api/window";
-import { getWindowPositions, setWindowPositions } from "@/api";
+import { getWindowPositions, setWindowPositions, getAlwaysOnTop } from "@/api";
 
 /**
  * 专注浮球模式的窗口操作封装（单窗口方案，不开新窗口）。
@@ -117,5 +117,24 @@ export async function restoreWindow(alwaysOnTop: boolean) {
     } catch (e) {
       console.error("恢复常态窗口位置失败，留在原地", e);
     }
+  }
+}
+
+/** 专注结束时把主窗口「置顶一次」以提醒填写任务弹窗。
+ *  临时 setAlwaysOnTop(true) 把窗口抬到 Z 序最顶（绕过 Windows 前台锁，比
+ *  setFocus 可靠--后者从后台抢焦点常被降级为任务栏闪烁），随后恢复用户持久化
+ *  的置顶偏好：偏好为 true 时是 no-op，偏好为 false 时窗口留在普通窗口最前
+ *  而非持久置顶，即「置顶一次」效果，不污染用户的置顶设置。
+ *  偏好取后端 getAlwaysOnTop() 而非 timer store 的 savedOnTop--后者仅在
+ *  enterMini() 赋值，本次专注若未进浮球则可能是上一轮的过期值。
+ *  失败仅记日志，不阻断弹窗流程。 */
+export async function bringToFrontOnce() {
+  try {
+    const w = getCurrentWindow();
+    const userPref = await getAlwaysOnTop();
+    await w.setAlwaysOnTop(true);
+    await w.setAlwaysOnTop(userPref);
+  } catch (e) {
+    console.error("置顶提醒失败", e);
   }
 }
